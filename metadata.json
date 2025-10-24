@@ -1,0 +1,5 @@
+{
+  "name": "Creative Suite: Draw, Paint, Story",
+  "description": "A responsive web application featuring three creative modules: Draw, Paint, and Story. It displays content in a three-column layout on desktops and switches to a tabbed view on mobile devices for an optimal user experience.",
+  "requestFramePermissions": []
+}
