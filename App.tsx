@@ -70,6 +70,7 @@ const App: React.FC = () => {
             const base64ImageBytes: string = part.inlineData.data;
             const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
             setColoringPageImage(imageUrl);
+            setActiveTab('paint'); // Auto-switch to paint tab on mobile
             break;
           }
         }
