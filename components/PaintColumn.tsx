@@ -7,17 +7,60 @@ const PaletteIcon: React.FC = () => (
     </svg>
 );
 
-const PaintColumn: React.FC = () => {
+interface PaintColumnProps {
+  coloringPageImage: string | null;
+  isLoading: boolean;
+  recognizedText: string | null;
+  error: string | null;
+}
+
+const LoadingSpinner: React.FC = () => (
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+);
+
+const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, isLoading, recognizedText, error }) => {
+  const handleDownload = () => {
+    if (coloringPageImage && recognizedText) {
+      const link = document.createElement('a');
+      link.href = coloringPageImage;
+      link.download = `${recognizedText}-coloring-page.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center text-center h-full">
         <PaletteIcon />
         <h2 className="text-2xl font-bold mt-4 mb-2 text-indigo-700">Paint</h2>
-        <p className="text-gray-600 flex-grow">
-            Mix colors and paint your masterpiece. Explore textures, gradients, and layers to create stunning digital paintings.
-        </p>
-        <button className="mt-6 bg-indigo-500 text-white font-bold py-2 px-6 rounded-full hover:bg-indigo-600 transition-all duration-300 transform hover:scale-105 shadow-lg">
-            Start Painting
-        </button>
+        
+        <div className="flex-grow flex flex-col justify-center items-center w-full">
+            {isLoading && (
+                <div className="text-center">
+                    <LoadingSpinner />
+                    <p className="mt-4 text-gray-600">Generating a coloring page for your "{recognizedText}"...</p>
+                </div>
+            )}
+            {!isLoading && coloringPageImage && (
+                <img src={coloringPageImage} alt={`${recognizedText} coloring page`} className="max-w-full max-h-64 object-contain border rounded-lg shadow-sm my-4"/>
+            )}
+            {!isLoading && !coloringPageImage && !error && (
+                 <p className="text-gray-600 px-4">
+                    After you draw something, a coloring page will appear here!
+                 </p>
+            )}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+
+        {coloringPageImage && !isLoading && (
+            <button
+                onClick={handleDownload}
+                className="mt-6 bg-indigo-500 text-white font-bold py-2 px-6 rounded-full hover:bg-indigo-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+                Download Coloring Page
+            </button>
+        )}
     </div>
   );
 };
