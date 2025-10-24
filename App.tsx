@@ -124,7 +124,7 @@ const App: React.FC = () => {
             <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>
           </div>
           <div className={`${commonColumnClasses} ${activeTab === 'story' ? '' : 'hidden'} md:flex`}>
-            <StoryColumn />
+            <StoryColumn recognizedText={recognizedObject} />
           </div>
         </div>
       </main>
