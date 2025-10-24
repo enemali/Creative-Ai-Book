@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
+import { generateStory, generateSpeech } from '../api';
 
 const BookIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -58,8 +58,6 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   useEffect(() => {
     if (!story) return;
     setDisplayedStory('');
@@ -84,15 +82,11 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     setAudioBuffer(null);
 
     try {
-      const prompt = `Write a short, fun, and imaginative story for a 5-year-old child about a ${recognizedText}. The story must be 4 to 5 sentences.`;
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      setStory(response.text.trim());
-    } catch (err) {
+      const storyText = await generateStory(recognizedText);
+      setStory(storyText);
+    } catch (err: any) {
       console.error("Story generation failed:", err);
-      setError("I'm sorry, I couldn't write a story right now. Please try again.");
+      setError(err.message || "I'm sorry, I couldn't write a story right now. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -124,17 +118,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     setIsReading(true);
     setError(null);
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: story }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-          },
-        },
-      });
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const base64Audio = await generateSpeech(story);
       if (base64Audio) {
         const decodedBytes = decode(base64Audio);
         const buffer = await decodeAudioData(decodedBytes, audioContextRef.current, 24000, 1);
@@ -143,9 +127,9 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
       } else {
         throw new Error("No audio data received.");
       }
-    } catch (err) {
+    } catch (err: any) {
         console.error("Audio generation failed:", err);
-        setError("Sorry, I couldn't read the story aloud.");
+        setError(err.message || "Sorry, I couldn't read the story aloud.");
     } finally {
         setIsReading(false);
     }

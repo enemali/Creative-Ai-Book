@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
 import DrawColumn from './components/DrawColumn';
 import PaintColumn from './components/PaintColumn';
 import StoryColumn from './components/StoryColumn';
+import { recognizeImage, generateColoringPage } from './api';
 
 type Tab = 'draw' | 'paint' | 'story';
 
@@ -21,8 +21,6 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   const handleRecognizeDrawing = async (base64ImageData: string) => {
     setIsRecognizing(true);
     setRecognizedObject(null);
@@ -30,21 +28,11 @@ const App: React.FC = () => {
     setOriginalDrawingImage(base64ImageData);
     setError(null);
     try {
-      const imagePart = {
-        inlineData: { mimeType: 'image/png', data: base64ImageData },
-      };
-      const textPart = { text: 'What is this a simple drawing of? Be concise, one or two words.' };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, textPart] },
-      });
-
-      const text = response.text.trim();
+      const text = await recognizeImage(base64ImageData);
       setRecognizedObject(text);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Recognition failed:", err);
-      setError("Sorry, I couldn't recognize that drawing. Please try again.");
+      setError(err.message || "Sorry, I couldn't recognize that drawing. Please try again.");
     } finally {
       setIsRecognizing(false);
     }
@@ -53,37 +41,22 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!recognizedObject) return;
 
-    const generateColoringPage = async () => {
+    const generatePage = async () => {
       setIsGenerating(true);
       setError(null);
       try {
-        const prompt = `A simple, bold, black and white coloring book page for a 5-year-old of a ${recognizedObject}.`;
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: prompt }] },
-          config: {
-            responseModalities: [Modality.IMAGE],
-          },
-        });
-        
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            const base64ImageBytes: string = part.inlineData.data;
-            const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
-            setColoringPageImage(imageUrl);
-            setActiveTab('paint'); // Auto-switch to paint tab on mobile
-            break;
-          }
-        }
-      } catch (err) {
+        const imageUrl = await generateColoringPage(recognizedObject);
+        setColoringPageImage(imageUrl);
+        setActiveTab('paint'); // Auto-switch to paint tab on mobile
+      } catch (err: any) {
         console.error("Image generation failed:", err);
-        setError(`Sorry, I couldn't create a coloring page for "${recognizedObject}".`);
+        setError(err.message || `Sorry, I couldn't create a coloring page for "${recognizedObject}".`);
       } finally {
         setIsGenerating(false);
       }
     };
 
-    generateColoringPage();
+    generatePage();
   }, [recognizedObject]);
 
   const commonColumnClasses = "p-6 border border-blue-300 rounded-lg shadow-md bg-white min-h-[60vh] flex flex-col";
