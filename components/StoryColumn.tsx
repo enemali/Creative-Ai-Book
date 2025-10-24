@@ -57,6 +57,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
   const [error, setError] = useState<string | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
   
   useEffect(() => {
     if (!story) return;
@@ -94,11 +95,23 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
 
   const playAudio = (buffer: AudioBuffer) => {
       if (!audioContextRef.current) return;
+      
+      if (backgroundMusicRef.current) {
+        backgroundMusicRef.current.volume = 0.1;
+        backgroundMusicRef.current.currentTime = 0;
+        backgroundMusicRef.current.play();
+      }
+
       setIsPlaying(true);
       const source = audioContextRef.current.createBufferSource();
       source.buffer = buffer;
       source.connect(audioContextRef.current.destination);
-      source.onended = () => setIsPlaying(false);
+      source.onended = () => {
+        setIsPlaying(false);
+        if (backgroundMusicRef.current) {
+          backgroundMusicRef.current.pause();
+        }
+      };
       source.start();
   };
 
@@ -106,7 +119,6 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     if (!story || isPlaying || isReading) return;
 
     if (!audioContextRef.current) {
-        // FIX: Cast window to any to access webkitAudioContext for broader browser support.
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     }
     
@@ -137,6 +149,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
 
   return (
     <div className="flex flex-col items-center text-center h-full">
+        <audio ref={backgroundMusicRef} src="/pianoSound.mp3" loop />
         <BookIcon />
         <h2 className="text-2xl font-bold mt-4 mb-2 text-emerald-700">Story</h2>
         
