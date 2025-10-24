@@ -44,7 +44,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Write a short, fun, and imaginative story for a 5-year-old child about a ${recognizedText}. The story should be about 3-4 paragraphs long.`;
+      const prompt = `Write a short, fun, and imaginative story for a 5-year-old child about a ${recognizedText}. The story must be 4 to 5 sentences.`;
       
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
