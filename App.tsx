@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import DrawColumn from './components/DrawColumn';
@@ -95,7 +94,7 @@ const App: React.FC = () => {
       </header>
 
       <main>
-        {/* Mobile Tabbed View */}
+        {/* Mobile Tabbed View Controls */}
         <div className="md:hidden">
           <div className="flex border-b border-blue-200 mb-4">
             {TABS.map((tab) => (
@@ -112,22 +111,17 @@ const App: React.FC = () => {
               </button>
             ))}
           </div>
-          <div className={commonColumnClasses}>
-            {activeTab === 'draw' && <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} recognizedText={recognizedObject} error={error}/>}
-            {activeTab === 'paint' && <PaintColumn coloringPageImage={coloringPageImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>}
-            {activeTab === 'story' && <StoryColumn />}
-          </div>
         </div>
 
-        {/* Desktop Side-by-Side View */}
-        <div className="hidden md:grid md:grid-cols-3 md:gap-6">
-          <div className={commonColumnClasses}>
-            <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} recognizedText={recognizedObject} error={error}/>
+        {/* Unified Content Area for Mobile and Desktop */}
+        <div className="flex flex-col md:grid md:grid-cols-3 md:gap-6">
+          <div className={`${commonColumnClasses} ${activeTab === 'draw' ? '' : 'hidden'} md:flex`}>
+            <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={error}/>
           </div>
-          <div className={commonColumnClasses}>
+          <div className={`${commonColumnClasses} ${activeTab === 'paint' ? '' : 'hidden'} md:flex`}>
             <PaintColumn coloringPageImage={coloringPageImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>
           </div>
-          <div className={commonColumnClasses}>
+          <div className={`${commonColumnClasses} ${activeTab === 'story' ? '' : 'hidden'} md:flex`}>
             <StoryColumn />
           </div>
         </div>

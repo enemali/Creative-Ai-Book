@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 
 const BrushIcon: React.FC = () => (
@@ -10,11 +9,12 @@ const BrushIcon: React.FC = () => (
 interface DrawColumnProps {
   onRecognize: (base64ImageData: string) => void;
   isLoading: boolean;
+  isGenerating: boolean;
   recognizedText: string | null;
   error: string | null;
 }
 
-const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, recognizedText, error }) => {
+const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGenerating, recognizedText, error }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
@@ -86,6 +86,8 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, recogni
     }
   };
 
+  const showOverlay = isLoading || isGenerating;
+
   return (
     <div className="flex flex-col items-center text-center h-full">
       <BrushIcon />
@@ -93,19 +95,29 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, recogni
       <p className="text-gray-600 mb-4">
         Draw something below and let AI figure out what it is!
       </p>
-      <canvas
-        ref={canvasRef}
-        width="300"
-        height="250"
-        className="border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-      />
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width="300"
+          height="250"
+          className="border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+        />
+        {showOverlay && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col justify-center items-center rounded-lg text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-500"></div>
+            <p className="mt-4 text-lg font-semibold text-blue-700">
+              {isGenerating ? 'Creating Page...' : 'Recognizing...'}
+            </p>
+          </div>
+        )}
+      </div>
       <div className="flex gap-4 mt-4">
         <button
           onClick={handleClearClick}
@@ -115,14 +127,14 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, recogni
         </button>
         <button
           onClick={handleRecognizeClick}
-          disabled={isLoading}
+          disabled={showOverlay}
           className="bg-blue-500 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100"
         >
           {isLoading ? 'Recognizing...' : 'Recognize'}
         </button>
       </div>
       <div className="mt-4 h-12 flex items-center justify-center">
-        {recognizedText && (
+        {recognizedText && !isGenerating && (
           <p className="text-lg text-green-600 font-semibold">I see a {recognizedText}!</p>
         )}
         {error && <p className="text-sm text-red-500">{error}</p>}
