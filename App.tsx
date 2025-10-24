@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('draw');
   const [recognizedObject, setRecognizedObject] = useState<string | null>(null);
   const [coloringPageImage, setColoringPageImage] = useState<string | null>(null);
+  const [originalDrawingImage, setOriginalDrawingImage] = useState<string | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ const App: React.FC = () => {
     setIsRecognizing(true);
     setRecognizedObject(null);
     setColoringPageImage(null);
+    setOriginalDrawingImage(base64ImageData);
     setError(null);
     try {
       const imagePart = {
@@ -119,7 +121,7 @@ const App: React.FC = () => {
             <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={error}/>
           </div>
           <div className={`${commonColumnClasses} ${activeTab === 'paint' ? '' : 'hidden'} md:flex`}>
-            <PaintColumn coloringPageImage={coloringPageImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>
+            <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>
           </div>
           <div className={`${commonColumnClasses} ${activeTab === 'story' ? '' : 'hidden'} md:flex`}>
             <StoryColumn />
