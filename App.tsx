@@ -61,6 +61,12 @@ const App: React.FC = () => {
 
   const commonColumnClasses = "p-6 border border-blue-300 rounded-lg shadow-md bg-white min-h-[60vh] flex flex-col";
 
+  const components: Record<Tab, React.ReactNode> = {
+    draw: <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={error} />,
+    paint: <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error} />,
+    story: <StoryColumn recognizedText={recognizedObject} />
+  };
+
   return (
     <div className="min-h-screen text-gray-800 p-4 sm:p-6 md:p-8">
       <header className="text-center mb-8">
@@ -90,15 +96,11 @@ const App: React.FC = () => {
 
         {/* Unified Content Area for Mobile and Desktop */}
         <div className="flex flex-col md:grid md:grid-cols-3 md:gap-6">
-          <div className={`${commonColumnClasses} ${activeTab === 'draw' ? '' : 'hidden'} md:flex`}>
-            <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={error}/>
-          </div>
-          <div className={`${commonColumnClasses} ${activeTab === 'paint' ? '' : 'hidden'} md:flex`}>
-            <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={error}/>
-          </div>
-          <div className={`${commonColumnClasses} ${activeTab === 'story' ? '' : 'hidden'} md:flex`}>
-            <StoryColumn recognizedText={recognizedObject} />
-          </div>
+          {TABS.map((tab) => (
+            <div key={tab.id} className={`${commonColumnClasses} ${activeTab === tab.id ? '' : 'hidden'} md:flex`}>
+              {components[tab.id]}
+            </div>
+          ))}
         </div>
       </main>
     </div>

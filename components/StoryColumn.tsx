@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { generateStory, generateSpeech } from '../api';
 
 const BookIcon: React.FC = () => (
@@ -50,15 +50,26 @@ interface StoryColumnProps {
 
 const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
   const [story, setStory] = useState<string | null>(null);
+  const [speechData, setSpeechData] = useState<string | null>(null);
   const [displayedStory, setDisplayedStory] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isReading, setIsReading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For story text generation
+  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false); // For speech generation
+  const [isReading, setIsReading] = useState(false); // Is speech currently playing
+  const [isMusicLoading, setIsMusicLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Refs for audio management
+  const musicAudioContextRef = useRef<AudioContext | null>(null);
+  const musicGainNodeRef = useRef<GainNode | null>(null);
+  const musicBufferRef = useRef<AudioBuffer | null>(null);
+  const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
   
+  const speechAudioContextRef = useRef<AudioContext | null>(null);
+  const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const audioJobIdRef = useRef(0);
+  
+  // Typing effect for the story text
   useEffect(() => {
     if (!story) return;
     setDisplayedStory('');
@@ -74,13 +85,156 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     return () => clearInterval(typingInterval);
   }, [story]);
 
+  const stopMusic = useCallback(() => {
+    if (musicSourceRef.current && musicAudioContextRef.current && musicGainNodeRef.current) {
+        musicGainNodeRef.current.gain.setTargetAtTime(0, musicAudioContextRef.current.currentTime, 0.2);
+        setTimeout(() => {
+            if (musicSourceRef.current) {
+                try {
+                    musicSourceRef.current.stop();
+                    musicSourceRef.current.disconnect();
+                    musicSourceRef.current = null;
+                } catch(e) { console.warn("Error stopping music", e); }
+            }
+        }, 300);
+    }
+  }, []);
+  
+  const stopSpeech = useCallback(() => {
+    audioJobIdRef.current += 1; // Invalidate any ongoing jobs
+    if (speechSourceRef.current) {
+        try {
+            speechSourceRef.current.stop();
+            speechSourceRef.current.disconnect();
+            speechSourceRef.current = null;
+        } catch(e) { console.warn("Error stopping speech", e); }
+    }
+    stopMusic();
+    setIsReading(false);
+  }, [stopMusic]);
+  
+  const startMusic = useCallback(async (jobId: number) => {
+    if (musicSourceRef.current || audioJobIdRef.current !== jobId) return;
+
+    setIsMusicLoading(true);
+    setError(null);
+    try {
+        if (!musicAudioContextRef.current || musicAudioContextRef.current.state === 'closed') {
+            musicAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            musicGainNodeRef.current = musicAudioContextRef.current.createGain();
+            musicGainNodeRef.current.connect(musicAudioContextRef.current.destination);
+        }
+        const audioContext = musicAudioContextRef.current;
+        await audioContext.resume();
+
+        if (!musicBufferRef.current) {
+            const response = await fetch('/pianoSound.mp3');
+            if (!response.ok) throw new Error(`Failed to fetch music file: ${response.statusText}`);
+            const arrayBuffer = await response.arrayBuffer();
+            musicBufferRef.current = await audioContext.decodeAudioData(arrayBuffer);
+        }
+
+        if (audioJobIdRef.current !== jobId) return;
+
+        const source = audioContext.createBufferSource();
+        source.buffer = musicBufferRef.current;
+        source.loop = true;
+        source.connect(musicGainNodeRef.current!);
+        musicGainNodeRef.current!.gain.value = 0; // Start silent
+        source.start();
+        musicSourceRef.current = source;
+    } catch (err: any) {
+        console.error("Failed to load or play music:", err);
+        setError(err.message || "Could not play background music.");
+    } finally {
+        if (audioJobIdRef.current === jobId) {
+            setIsMusicLoading(false);
+        }
+    }
+  }, []);
+
+  const handleReadStory = useCallback(async () => {
+    if (isReading) {
+        stopSpeech();
+        return;
+    }
+    if (!story) return;
+
+    const jobId = ++audioJobIdRef.current;
+
+    const playAudioFromData = async (currentSpeechData: string) => {
+        setIsReading(true);
+        setError(null);
+        try {
+            if (jobId !== audioJobIdRef.current) { setIsReading(false); return; }
+
+            await startMusic(jobId);
+            if (jobId !== audioJobIdRef.current) { stopMusic(); return; }
+
+            if (!speechAudioContextRef.current || speechAudioContextRef.current.state === 'closed') {
+                speechAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            }
+            const audioContext = speechAudioContextRef.current;
+            await audioContext.resume();
+
+            const speechBuffer = await decodeAudioData(decode(currentSpeechData), audioContext, 24000, 1);
+            if (jobId !== audioJobIdRef.current) { setIsReading(false); stopMusic(); return; }
+            
+            if (musicGainNodeRef.current && musicAudioContextRef.current) {
+                musicGainNodeRef.current.gain.setTargetAtTime(0.2, musicAudioContextRef.current.currentTime, 0.5);
+            }
+
+            const speechSource = audioContext.createBufferSource();
+            speechSource.buffer = speechBuffer;
+            speechSource.connect(audioContext.destination);
+            speechSource.onended = () => {
+                if (jobId === audioJobIdRef.current && speechSourceRef.current === speechSource) {
+                    stopSpeech();
+                }
+            };
+            speechSourceRef.current = speechSource;
+            speechSource.start();
+
+        } catch (err: any) {
+            console.error(err);
+            if (jobId === audioJobIdRef.current) {
+                setError(err.message || "An unknown error occurred while playing audio.");
+                stopSpeech();
+            }
+        }
+    };
+
+    if (speechData) {
+        await playAudioFromData(speechData);
+    } else {
+        setIsGeneratingSpeech(true);
+        setError(null);
+        try {
+            const newSpeechData = await generateSpeech(story);
+            if (jobId !== audioJobIdRef.current) return;
+            setSpeechData(newSpeechData);
+            await playAudioFromData(newSpeechData);
+        } catch (err: any) {
+            console.error(err);
+            if (jobId === audioJobIdRef.current) {
+                setError(err.message || "Failed to generate speech audio.");
+            }
+        } finally {
+            if (jobId === audioJobIdRef.current) {
+                setIsGeneratingSpeech(false);
+            }
+        }
+    }
+  }, [story, speechData, isReading, stopSpeech, startMusic, stopMusic]);
+
   const handleStartWriting = async () => {
     if (!recognizedText) return;
+    stopSpeech();
     setIsLoading(true);
     setError(null);
     setStory(null);
     setDisplayedStory('');
-    setAudioBuffer(null);
+    setSpeechData(null);
 
     try {
       const storyText = await generateStory(recognizedText);
@@ -93,63 +247,21 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     }
   };
 
-  const playAudio = (buffer: AudioBuffer) => {
-      if (!audioContextRef.current) return;
-      
-      if (backgroundMusicRef.current) {
-        backgroundMusicRef.current.volume = 0.1;
-        backgroundMusicRef.current.currentTime = 0;
-        backgroundMusicRef.current.play();
-      }
-
-      setIsPlaying(true);
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioContextRef.current.destination);
-      source.onended = () => {
-        setIsPlaying(false);
-        if (backgroundMusicRef.current) {
-          backgroundMusicRef.current.pause();
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+        stopSpeech();
+        if (speechAudioContextRef.current) {
+            speechAudioContextRef.current.close().catch(() => {});
         }
-      };
-      source.start();
-  };
-
-  const handleReadStory = async () => {
-    if (!story || isPlaying || isReading) return;
-
-    if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    }
-    
-    if (audioBuffer) {
-        playAudio(audioBuffer);
-        return;
-    }
-
-    setIsReading(true);
-    setError(null);
-    try {
-      const base64Audio = await generateSpeech(story);
-      if (base64Audio) {
-        const decodedBytes = decode(base64Audio);
-        const buffer = await decodeAudioData(decodedBytes, audioContextRef.current, 24000, 1);
-        setAudioBuffer(buffer);
-        playAudio(buffer);
-      } else {
-        throw new Error("No audio data received.");
-      }
-    } catch (err: any) {
-        console.error("Audio generation failed:", err);
-        setError(err.message || "Sorry, I couldn't read the story aloud.");
-    } finally {
-        setIsReading(false);
-    }
-  };
+        if (musicAudioContextRef.current) {
+            musicAudioContextRef.current.close().catch(() => {});
+        }
+    };
+  }, [stopSpeech]);
 
   return (
     <div className="flex flex-col items-center text-center h-full">
-        <audio ref={backgroundMusicRef} src="/pianoSound.mp3" loop />
         <BookIcon />
         <h2 className="text-2xl font-bold mt-4 mb-2 text-emerald-700">Story</h2>
         
@@ -178,22 +290,22 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
             {story && (
                 <button
                     onClick={handleReadStory}
-                    disabled={isReading || isPlaying || isLoading}
+                    disabled={isLoading || isGeneratingSpeech}
                     className="bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center w-36"
                 >
-                    {isReading ? (
+                    {isGeneratingSpeech || isMusicLoading ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                     ) : (
                         <>
                             <SpeakerIcon className="h-5 w-5 mr-2" />
-                            <span>{isPlaying ? 'Playing...' : 'Read Story'}</span>
+                            <span>{isReading ? 'Stop' : 'Read Story'}</span>
                         </>
                     )}
                 </button>
             )}
             <button 
                 onClick={handleStartWriting}
-                disabled={!recognizedText || isLoading || isReading}
+                disabled={!recognizedText || isLoading || isReading || isGeneratingSpeech}
                 className="bg-emerald-500 text-white font-bold py-2 px-6 rounded-full hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-emerald-300 disabled:scale-100 disabled:cursor-not-allowed"
             >
                 {isLoading ? 'Writing...' : story ? 'Write Another' : 'Start Writing'}
