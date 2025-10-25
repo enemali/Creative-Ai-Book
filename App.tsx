@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import DrawColumn from './components/DrawColumn';
 import PaintColumn from './components/PaintColumn';
@@ -11,6 +12,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'paint', label: 'Paint' },
   { id: 'story', label: 'Story' },
 ];
+
+const TAB_STYLING: Record<Tab, { bg: string; border: string }> = {
+  draw: { bg: 'bg-amber-50', border: 'border-amber-200' },
+  paint: { bg: 'bg-orange-50', border: 'border-orange-200' },
+  story: { bg: 'bg-rose-50', border: 'border-rose-200' },
+};
+
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('draw');
@@ -59,7 +67,7 @@ const App: React.FC = () => {
     generatePage();
   }, [recognizedObject]);
 
-  const commonColumnClasses = "p-6 border border-blue-300 rounded-lg shadow-md bg-white min-h-[60vh] flex flex-col";
+  const commonColumnClasses = "p-6 border rounded-lg shadow-md min-h-[60vh] flex flex-col";
 
   const components: Record<Tab, React.ReactNode> = {
     draw: <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={error} />,
@@ -68,10 +76,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen text-gray-800 p-4 sm:p-6 md:p-8">
+    <div className="min-h-screen text-stone-800 p-4 sm:p-6 md:p-8">
       <header className="text-center mb-8">
         <h1 className="text-4xl md:text-5xl font-bold text-blue-600 tracking-tight">Creative Suite</h1>
-        <p className="text-lg text-gray-600 mt-2">Your AI-powered space to draw, paint, and tell stories.</p>
+        <p className="text-lg text-stone-600 mt-2">Your AI-powered space to draw, paint, and tell stories.</p>
       </header>
 
       <main>
@@ -85,7 +93,7 @@ const App: React.FC = () => {
                 className={`flex-1 py-3 px-2 font-semibold text-center transition-colors duration-300 ease-in-out text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50'
-                    : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50'
+                    : 'text-stone-500 hover:text-blue-500 hover:bg-blue-50/50'
                 }`}
               >
                 {tab.label}
@@ -97,7 +105,7 @@ const App: React.FC = () => {
         {/* Unified Content Area for Mobile and Desktop */}
         <div className="flex flex-col md:grid md:grid-cols-3 md:gap-6">
           {TABS.map((tab) => (
-            <div key={tab.id} className={`${commonColumnClasses} ${activeTab === tab.id ? '' : 'hidden'} md:flex`}>
+            <div key={tab.id} className={`${commonColumnClasses} ${TAB_STYLING[tab.id].bg} ${TAB_STYLING[tab.id].border} ${activeTab === tab.id ? '' : 'hidden'} md:flex`}>
               {components[tab.id]}
             </div>
           ))}
