@@ -1,37 +1,52 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-const BrushIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
-  </svg>
-);
-
 interface DrawColumnProps {
   onRecognize: (base64ImageData: string) => void;
   isLoading: boolean;
   isGenerating: boolean;
   recognizedText: string | null;
   error: string | null;
+  onPlaySound: (soundUrl: string) => void;
 }
 
-const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGenerating, recognizedText, error }) => {
+const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGenerating, recognizedText, error, onPlaySound }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const getContext = () => canvasRef.current?.getContext('2d');
 
   useEffect(() => {
-    const context = getContext();
-    if (context) {
-      context.fillStyle = "white";
-      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-      context.lineCap = 'round';
-      context.strokeStyle = 'black';
-      context.lineWidth = 3;
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const { width, height } = entry.contentRect;
+            canvas.width = width;
+            canvas.height = height;
+            
+            const context = getContext();
+            if (context) {
+                context.fillStyle = "white";
+                context.fillRect(0, 0, width, height);
+                context.lineCap = 'round';
+                context.strokeStyle = 'black';
+                context.lineWidth = 3;
+            }
+        }
+    });
+
+    resizeObserver.observe(canvas);
+
+    return () => {
+        resizeObserver.disconnect();
+    };
   }, []);
   
   const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
+    setValidationError(null);
     const { offsetX, offsetY } = getCoords(event);
     const context = getContext();
     if (!context) return;
@@ -42,6 +57,9 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
 
   const draw = (event: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
+    if (!hasDrawn) {
+        setHasDrawn(true);
+    }
     const { offsetX, offsetY } = getCoords(event);
     const context = getContext();
     if (!context) return;
@@ -70,6 +88,11 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
   };
 
   const handleRecognizeClick = () => {
+    if (!hasDrawn) {
+        setValidationError("Please draw something first.");
+        onPlaySound('/error.mp3');
+        return;
+    }
     const canvas = canvasRef.current;
     if (canvas) {
       const dataUrl = canvas.toDataURL('image/png');
@@ -83,6 +106,8 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
     if (context) {
       context.fillStyle = "white";
       context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+      setHasDrawn(false);
+      setValidationError(null);
     }
   };
 
@@ -90,17 +115,16 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
 
   return (
     <div className="flex flex-col items-center text-center h-full">
-      <BrushIcon />
-      <h2 className="text-2xl font-bold mt-4 mb-2 text-blue-700">Draw</h2>
-      <p className="text-gray-600 mb-4">
-        Draw something below and let AI figure out what it is!
+      <div className="flex items-center justify-center gap-2 mb-1">
+        <h2 className="text-2xl font-bold text-blue-700">Draw</h2>
+      </div>
+      <p className="text-gray-600 mb-2">
+        Draw something below
       </p>
-      <div className="relative">
+      <div className="relative w-full">
         <canvas
           ref={canvasRef}
-          width="300"
-          height="250"
-          className="border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
+          className="w-full aspect-[6/5] border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -110,15 +134,20 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
           onTouchEnd={stopDrawing}
         />
         {showOverlay && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col justify-center items-center rounded-lg text-center">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col justify-center items-center rounded-lg text-center p-4">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-500"></div>
             <p className="mt-4 text-lg font-semibold text-blue-700">
               {isGenerating ? 'Creating Page...' : 'Recognizing...'}
             </p>
+            {isGenerating && recognizedText && (
+              <p className="mt-2 text-base text-green-600 font-semibold">
+                I see a {recognizedText}!
+              </p>
+            )}
           </div>
         )}
       </div>
-      <div className="flex gap-4 mt-4">
+      <div className="flex gap-4 mt-2">
         <button
           onClick={handleClearClick}
           className="bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-full hover:bg-gray-300 transition-all duration-300"
@@ -133,11 +162,14 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
           {isLoading ? 'Recognizing...' : 'Recognize'}
         </button>
       </div>
-      <div className="mt-4 h-12 flex items-center justify-center">
-        {recognizedText && !isGenerating && (
-          <p className="text-lg text-green-600 font-semibold">I see a {recognizedText}!</p>
-        )}
-        {error && <p className="text-sm text-red-500">{error}</p>}
+      <div className="mt-2 h-12 flex items-center justify-center">
+        {validationError ? (
+            <p className="text-sm text-red-500">{validationError}</p>
+        ) : error ? (
+            <p className="text-sm text-red-500">{error}</p>
+        ) : recognizedText && !isGenerating ? (
+            <p className="text-lg text-green-600 font-semibold">I see a {recognizedText}!</p>
+        ) : null}
       </div>
     </div>
   );

@@ -1,11 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-const PaletteIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-    </svg>
-);
-
 const BrushModeIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
@@ -25,6 +19,26 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
+const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+);
+
+// Theme Icons
+const HealthIcon: React.FC<{className?: string}> = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>;
+const ScienceIcon: React.FC<{className?: string}> = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7 2a.75.75 0 01.75.75V4h4.5V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0116.75 6.75v8.5A2.75 2.75 0 0114 18H6a2.75 2.75 0 01-2.75-2.75v-8.5A2.75 2.75 0 016 .25h.25V2.75A.75.75 0 017 2zM6.5 6.75v8.5a1.25 1.25 0 001.25 1.25h5.5a1.25 1.25 0 001.25-1.25v-8.5H6.5z" clipRule="evenodd" /></svg>;
+const SpookyIcon: React.FC<{className?: string}> = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z" /><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-1.414 1.414a1 1 0 01-1.414-1.414l1.414-1.414a1 1 0 011.414 0zM5.293 16.707a1 1 0 010-1.414l1.414-1.414a1 1 0 111.414 1.414l-1.414 1.414a1 1 0 01-1.414 0zM15.293 16.707a1 1 0 01-1.414 0l-1.414-1.414a1 1 0 011.414-1.414l1.414 1.414a1 1 0 010 1.414zM6.707 6.707a1 1 0 011.414 0l-1.414 1.414a1 1 0 11-1.414-1.414l1.414-1.414z" clipRule="evenodd" /></svg>;
+const FamilyIcon: React.FC<{className?: string}> = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clipRule="evenodd" /></svg>;
+const HonestyIcon: React.FC<{className?: string}> = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5a.75.75 0 0110 15zM4.093 4.093a.75.75 0 011.06 0l1.415 1.415a.75.75 0 11-1.06 1.06L4.093 5.153a.75.75 0 010-1.06zm9.754 9.754a.75.75 0 010 1.06l-1.414 1.414a.75.75 0 11-1.06-1.06l1.414-1.414a.75.75 0 011.06 0zM15.907 4.093a.75.75 0 010 1.06l-1.414 1.415a.75.75 0 11-1.06-1.06l1.414-1.414a.75.75 0 011.06 0zm-9.754 9.754a.75.75 0 011.06 0l1.414-1.414a.75.75 0 11-1.06-1.06l-1.414 1.414a.75.75 0 010 1.06z" clipRule="evenodd" /></svg>;
+
+const THEMES = [
+    { id: 'health', label: 'Health', Icon: HealthIcon, color: 'text-red-500', bg: 'bg-red-100' },
+    { id: 'science', label: 'Science', Icon: ScienceIcon, color: 'text-blue-500', bg: 'bg-blue-100' },
+    { id: 'spooky', label: 'Spooky', Icon: SpookyIcon, color: 'text-purple-500', bg: 'bg-purple-100' },
+    { id: 'family', label: 'Family', Icon: FamilyIcon, color: 'text-green-500', bg: 'bg-green-100' },
+    { id: 'honesty', label: 'Honesty', Icon: HonestyIcon, color: 'text-yellow-500', bg: 'bg-yellow-100' },
+];
 
 interface PaintColumnProps {
   coloringPageImage: string | null;
@@ -32,6 +46,10 @@ interface PaintColumnProps {
   isLoading: boolean;
   recognizedText: string | null;
   error: string | null;
+  onStartStory: () => void;
+  isWritingStory: boolean;
+  selectedTheme: string | null;
+  onThemeChange: (theme: string) => void;
 }
 
 const COLORS = [
@@ -39,7 +57,7 @@ const COLORS = [
   '#00FFFF', '#FFA500', '#800080', '#4B0082', '#A52A2A', '#FFFFFF'
 ];
 
-const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDrawingImage, isLoading, recognizedText }) => {
+const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDrawingImage, isLoading, recognizedText, onStartStory, isWritingStory, selectedTheme, onThemeChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPainting, setIsPainting] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
@@ -121,16 +139,48 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const context = getContext();
-    if (canvas && context && coloringPageImage) {
-      const img = new Image();
-      img.onload = () => {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(img, 0, 0, canvas.width, canvas.height);
-      };
-      img.src = coloringPageImage;
+    if (!canvas) return;
+
+    let image: HTMLImageElement | null = null;
+    if (coloringPageImage) {
+        image = new Image();
+        image.src = coloringPageImage;
     }
-  }, [coloringPageImage]);
+
+    const redraw = () => {
+        if (!canvas) return;
+        const context = getContext();
+        if (!context) return;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        if (image) {
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        }
+    };
+    
+    if (image) {
+        image.onload = redraw;
+    } else {
+        redraw(); // Clear canvas if no image
+    }
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const { width, height } = entry.contentRect;
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+                redraw();
+            }
+        }
+    });
+
+    resizeObserver.observe(canvas);
+
+    return () => {
+        resizeObserver.disconnect();
+    };
+}, [coloringPageImage]);
+
 
   const startPainting = (event: React.MouseEvent | React.TouchEvent) => {
     const { offsetX, offsetY } = getCoords(event);
@@ -213,14 +263,18 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
     }
   };
 
+  const ActiveThemeIcon = THEMES.find(t => t.id === selectedTheme)?.Icon;
+
+
   return (
     <div className="flex flex-col items-center text-center h-full">
-      <PaletteIcon />
-      <h2 className="text-2xl font-bold mt-4 mb-2 text-indigo-700">Paint</h2>
+      <div className="flex items-center justify-center gap-2 mb-1">
+        <h2 className="text-2xl font-bold text-indigo-700">Paint</h2>
+      </div>
       {coloringPageImage ? (
         <>
-            <p className="text-gray-600 mb-4">Color in the drawing of a {recognizedText || 'creation'}!</p>
-            <div className="relative">
+            <p className="text-gray-600 mb-2">Color in the drawing of a {recognizedText || 'creation'}!</p>
+            <div className="relative w-full">
               {originalDrawingImage && (
                   <img
                       src={`data:image/png;base64,${originalDrawingImage}`}
@@ -230,9 +284,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
               )}
               <canvas
                 ref={canvasRef}
-                width="300"
-                height="250"
-                className="border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
+                className="w-full aspect-[6/5] border border-gray-300 rounded-lg shadow-inner touch-none bg-white"
                 onMouseDown={handleCanvasAction}
                 onMouseMove={paintMode === 'brush' ? paint : undefined}
                 onMouseUp={paintMode === 'brush' ? stopPainting : undefined}
@@ -242,33 +294,15 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                 onTouchEnd={paintMode === 'brush' ? stopPainting : undefined}
               />
             </div>
-            <div className="mt-4 w-full flex flex-col items-center">
-              <div className="flex gap-2 p-1 bg-gray-200 rounded-full mb-4">
+            <div className="mt-2 w-full flex flex-col items-center">
+              <div className="flex gap-2 p-1 bg-gray-200 rounded-full mb-2">
                   <button onClick={() => setPaintMode('brush')} className={`flex items-center gap-2 py-1.5 px-4 rounded-full text-sm font-semibold transition-colors ${paintMode === 'brush' ? 'bg-white text-indigo-600 shadow' : 'text-gray-600'}`}>
                       <BrushModeIcon className="h-5 w-5" />
                       <span>Brush</span>
                   </button>
-                  <button onClick={() => setPaintMode('fill')} className={`flex items-center gap-2 py-1.5 px-4 rounded-full text-sm font-semibold transition-colors ${paintMode === 'fill' ? 'bg-white text-indigo-600 shadow' : 'text-gray-600'}`}>
-                      <FillModeIcon className="h-5 w-5" />
-                      <span>Fill</span>
-                  </button>
-              </div>
-
-              <div className="grid grid-cols-6 gap-2 max-w-xs mx-auto mb-4">
-                {COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setCurrentColor(color)}
-                    className={`w-10 h-10 rounded-full border-2 transition-transform duration-200 ${currentColor === color ? 'border-indigo-500 scale-110' : 'border-gray-200 hover:scale-105'}`}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Select color ${color}`}
-                  />
-                ))}
-              </div>
-              
-              {paintMode === 'brush' && (
-                <div className="flex items-center justify-center gap-4 mb-4">
-                    <label htmlFor="brushSize" className="font-semibold text-gray-700">Brush Size:</label>
+                    {paintMode === 'brush' && (
+                <div className="flex items-center justify-center ">
+                    <label htmlFor="brushSize" className="font-semibold text-gray-700">Size:</label>
                     <input
                       type="range"
                       id="brushSize"
@@ -280,8 +314,37 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                     />
                 </div>
               )}
+                  <button onClick={() => setPaintMode('fill')} className={`flex items-center gap-2 py-1.5 px-4 rounded-full text-sm font-semibold transition-colors ${paintMode === 'fill' ? 'bg-white text-indigo-600 shadow' : 'text-gray-600'}`}>
+                      <FillModeIcon className="h-5 w-5" />
+                      <span>Fill</span>
+                  </button>
+              </div>
 
-              <div className="flex items-center justify-center gap-4 w-full mt-2">
+              <div className="grid grid-cols-12 gap-1 max-w-xs mx-auto mb-2">
+                {COLORS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setCurrentColor(color)}
+                    className={`w-5 h-5 rounded-full border-2 transition-transform duration-200 ${currentColor === color ? 'border-indigo-500 scale-110' : 'border-gray-200 hover:scale-105'}`}
+                    style={{ backgroundColor: color }}
+                    aria-label={`Select color ${color}`}
+                  />
+                ))}
+              </div>
+              
+                <div className="w-full p-2 bg-indigo-50 border border-indigo-200 rounded-lg mb-2">
+                    <p className="font-semibold text-indigo-800 text-sm mb-2">Choose a Story Theme</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {THEMES.map(theme => (
+                            <button key={theme.id} onClick={() => onThemeChange(theme.id)} className={`flex items-center gap-2 py-1 px-3 rounded-full text-sm font-semibold transition-all duration-200 border-2 ${selectedTheme === theme.id ? `${theme.bg} ${theme.color} border-current` : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                                <theme.Icon className="h-4 w-4" />
+                                <span>{theme.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-4 w-full mt-1">
                 <button
                   onClick={handleResetClick}
                   className="bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-full hover:bg-gray-300 transition-all duration-300"
@@ -293,7 +356,14 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                   className="bg-indigo-500 text-white font-bold py-2 px-6 rounded-full hover:bg-indigo-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
                 >
                   <DownloadIcon className="h-5 w-5" />
-                  <span>Download</span>
+                </button>
+                <button
+                  onClick={onStartStory}
+                  disabled={isWritingStory || !recognizedText || !selectedTheme}
+                  className="bg-emerald-500 text-white font-bold py-2 px-6 rounded-full hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:bg-emerald-300 disabled:scale-100 disabled:cursor-not-allowed"
+                >
+                  {ActiveThemeIcon ? <ActiveThemeIcon className="h-5 w-5" /> : <BookIcon className="h-5 w-5" />}
+                  <span>{isWritingStory ? 'Writing...' : 'Write Story'}</span>
                 </button>
               </div>
             </div>
@@ -307,7 +377,6 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
             </>
           ) : (
             <div className="text-center text-gray-500">
-              <PaletteIcon />
               <p className="mt-4">Draw something on the 'Draw' tab first.</p>
               <p>Your coloring page will appear here!</p>
             </div>

@@ -1,11 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { generateStory, generateSpeech } from '../api';
-
-const BookIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-);
 
 const SpeakerIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -46,17 +39,19 @@ async function decodeAudioData(
 
 interface StoryColumnProps {
   recognizedText: string | null;
+  story: string | null;
+  storyImage: string | null;
+  speechData: string | null;
+  isWritingStory: boolean;
+  storyError: string | null;
+  onStartStory: () => void;
 }
 
-const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
-  const [story, setStory] = useState<string | null>(null);
-  const [speechData, setSpeechData] = useState<string | null>(null);
+const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyImage, speechData, isWritingStory, storyError, onStartStory }) => {
   const [displayedStory, setDisplayedStory] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false); // For story text generation
-  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false); // For speech generation
-  const [isReading, setIsReading] = useState(false); // Is speech currently playing
+  const [isReading, setIsReading] = useState(false);
   const [isMusicLoading, setIsMusicLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
 
   // Refs for audio management
   const musicAudioContextRef = useRef<AudioContext | null>(null);
@@ -69,9 +64,13 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
 
   const audioJobIdRef = useRef(0);
   
-  // Typing effect for the story text
+  // Typing effect and state reset
   useEffect(() => {
-    if (!story) return;
+    if (!story) {
+      setDisplayedStory('');
+      return;
+    };
+    
     setDisplayedStory('');
     let i = 0;
     const typingInterval = setInterval(() => {
@@ -117,7 +116,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
     if (musicSourceRef.current || audioJobIdRef.current !== jobId) return;
 
     setIsMusicLoading(true);
-    setError(null);
+    setSpeechError(null);
     try {
         if (!musicAudioContextRef.current || musicAudioContextRef.current.state === 'closed') {
             musicAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -145,7 +144,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
         musicSourceRef.current = source;
     } catch (err: any) {
         console.error("Failed to load or play music:", err);
-        setError(err.message || "Could not play background music.");
+        setSpeechError(err.message || "Could not play background music.");
     } finally {
         if (audioJobIdRef.current === jobId) {
             setIsMusicLoading(false);
@@ -158,93 +157,57 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
         stopSpeech();
         return;
     }
-    if (!story) return;
+    if (!speechData) {
+        setSpeechError("The audio for this story isn't ready yet.");
+        return;
+    }
 
     const jobId = ++audioJobIdRef.current;
-
-    const playAudioFromData = async (currentSpeechData: string) => {
-        setIsReading(true);
-        setError(null);
-        try {
-            if (jobId !== audioJobIdRef.current) { setIsReading(false); return; }
-
-            await startMusic(jobId);
-            if (jobId !== audioJobIdRef.current) { stopMusic(); return; }
-
-            if (!speechAudioContextRef.current || speechAudioContextRef.current.state === 'closed') {
-                speechAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            }
-            const audioContext = speechAudioContextRef.current;
-            await audioContext.resume();
-
-            const speechBuffer = await decodeAudioData(decode(currentSpeechData), audioContext, 24000, 1);
-            if (jobId !== audioJobIdRef.current) { setIsReading(false); stopMusic(); return; }
-            
-            if (musicGainNodeRef.current && musicAudioContextRef.current) {
-                musicGainNodeRef.current.gain.setTargetAtTime(0.2, musicAudioContextRef.current.currentTime, 0.5);
-            }
-
-            const speechSource = audioContext.createBufferSource();
-            speechSource.buffer = speechBuffer;
-            speechSource.connect(audioContext.destination);
-            speechSource.onended = () => {
-                if (jobId === audioJobIdRef.current && speechSourceRef.current === speechSource) {
-                    stopSpeech();
-                }
-            };
-            speechSourceRef.current = speechSource;
-            speechSource.start();
-
-        } catch (err: any) {
-            console.error(err);
-            if (jobId === audioJobIdRef.current) {
-                setError(err.message || "An unknown error occurred while playing audio.");
-                stopSpeech();
-            }
-        }
-    };
-
-    if (speechData) {
-        await playAudioFromData(speechData);
-    } else {
-        setIsGeneratingSpeech(true);
-        setError(null);
-        try {
-            const newSpeechData = await generateSpeech(story);
-            if (jobId !== audioJobIdRef.current) return;
-            setSpeechData(newSpeechData);
-            await playAudioFromData(newSpeechData);
-        } catch (err: any) {
-            console.error(err);
-            if (jobId === audioJobIdRef.current) {
-                setError(err.message || "Failed to generate speech audio.");
-            }
-        } finally {
-            if (jobId === audioJobIdRef.current) {
-                setIsGeneratingSpeech(false);
-            }
-        }
-    }
-  }, [story, speechData, isReading, stopSpeech, startMusic, stopMusic]);
-
-  const handleStartWriting = async () => {
-    if (!recognizedText) return;
-    stopSpeech();
-    setIsLoading(true);
-    setError(null);
-    setStory(null);
-    setDisplayedStory('');
-    setSpeechData(null);
+    setIsReading(true);
+    setSpeechError(null);
 
     try {
-      const storyText = await generateStory(recognizedText);
-      setStory(storyText);
+        if (jobId !== audioJobIdRef.current) { setIsReading(false); return; }
+
+        await startMusic(jobId);
+        if (jobId !== audioJobIdRef.current) { stopMusic(); return; }
+
+        if (!speechAudioContextRef.current || speechAudioContextRef.current.state === 'closed') {
+            speechAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        const audioContext = speechAudioContextRef.current;
+        await audioContext.resume();
+
+        const speechBuffer = await decodeAudioData(decode(speechData), audioContext, 24000, 1);
+        if (jobId !== audioJobIdRef.current) { setIsReading(false); stopMusic(); return; }
+        
+        if (musicGainNodeRef.current && musicAudioContextRef.current) {
+            musicGainNodeRef.current.gain.setTargetAtTime(0.2, musicAudioContextRef.current.currentTime, 0.5);
+        }
+
+        const speechSource = audioContext.createBufferSource();
+        speechSource.buffer = speechBuffer;
+        speechSource.connect(audioContext.destination);
+        speechSource.onended = () => {
+            if (jobId === audioJobIdRef.current && speechSourceRef.current === speechSource) {
+                stopSpeech();
+            }
+        };
+        speechSourceRef.current = speechSource;
+        speechSource.start();
+
     } catch (err: any) {
-      console.error("Story generation failed:", err);
-      setError(err.message || "I'm sorry, I couldn't write a story right now. Please try again.");
-    } finally {
-      setIsLoading(false);
+        console.error(err);
+        if (jobId === audioJobIdRef.current) {
+            setSpeechError(err.message || "An unknown error occurred while playing audio.");
+            stopSpeech();
+        }
     }
+  }, [speechData, isReading, stopSpeech, startMusic, stopMusic]);
+
+  const handleWriteAnother = () => {
+    stopSpeech();
+    onStartStory();
   };
 
   // Cleanup on unmount
@@ -262,38 +225,50 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
 
   return (
     <div className="flex flex-col items-center text-center h-full">
-        <BookIcon />
-        <h2 className="text-2xl font-bold mt-4 mb-2 text-emerald-700">Story</h2>
+        <div className="flex items-center justify-center gap-2 mb-1">
+            <h2 className="text-2xl font-bold text-emerald-700">Story</h2>
+        </div>
         
-        <div className="flex-grow w-full flex flex-col items-center justify-center">
-            {isLoading ? (
+        <div className="flex-grow w-full flex flex-col items-center justify-center mt-2">
+            {isWritingStory ? (
                 <>
                     <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-200 border-t-emerald-500"></div>
-                    <p className="mt-4 text-lg font-semibold text-emerald-700">Writing a magical story...</p>
+                    <p className="mt-4 text-lg font-semibold text-emerald-700">Crafting your story...</p>
                 </>
-            ) : error ? (
-                <p className="text-sm text-red-500">{error}</p>
+            ) : storyError ? (
+                <p className="text-sm text-red-500">{storyError}</p>
             ) : story ? (
-                <div className="w-full h-full text-left p-4 bg-gray-50 rounded-lg overflow-y-auto border border-gray-200">
-                    <p className="text-gray-700 whitespace-pre-wrap font-serif text-lg leading-relaxed">{displayedStory}{displayedStory === story ? '' : <span className="inline-block w-2 h-5 bg-emerald-600 animate-pulse ml-1"></span>}</p>
+                <div className="w-full h-full flex flex-col">
+                    {storyImage ? (
+                        <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                            <img src={storyImage} alt={`Illustration for a story about a ${recognizedText}`} className="w-full h-full object-cover" />
+                        </div>
+                    ) : (
+                         <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+                            <p className="text-gray-400 text-sm">Illustration loading...</p>
+                        </div>
+                    )}
+                    <div className="flex-1 min-h-0 w-full text-left p-2 bg-white rounded-lg overflow-y-auto border border-gray-200">
+                        <p className="text-gray-700 whitespace-pre-wrap font-serif text-base leading-relaxed">{displayedStory}{displayedStory === story ? '' : <span className="inline-block w-2 h-4 bg-emerald-600 animate-pulse ml-1"></span>}</p>
+                    </div>
                 </div>
             ) : (
                 <p className="text-gray-600">
                     {recognizedText 
-                        ? `Ready to write a story about a ${recognizedText}?` 
-                        : "Draw something on the 'Draw' tab, and I'll write a story about it!"}
+                        ? `Go to the 'Paint' tab to write a story about a ${recognizedText}!` 
+                        : "Draw something, then create a story!"}
                 </p>
             )}
         </div>
 
-        <div className="mt-6 flex gap-4 items-center justify-center">
+        <div className="mt-4 flex gap-4 items-center justify-center">
             {story && (
                 <button
                     onClick={handleReadStory}
-                    disabled={isLoading || isGeneratingSpeech}
+                    disabled={isWritingStory || !speechData}
                     className="bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center w-36"
                 >
-                    {isGeneratingSpeech || isMusicLoading ? (
+                    {isMusicLoading ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                     ) : (
                         <>
@@ -303,14 +278,17 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText }) => {
                     )}
                 </button>
             )}
-            <button 
-                onClick={handleStartWriting}
-                disabled={!recognizedText || isLoading || isReading || isGeneratingSpeech}
-                className="bg-emerald-500 text-white font-bold py-2 px-6 rounded-full hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-emerald-300 disabled:scale-100 disabled:cursor-not-allowed"
-            >
-                {isLoading ? 'Writing...' : story ? 'Write Another' : 'Start Writing'}
-            </button>
+            {story && recognizedText && (
+              <button 
+                  onClick={handleWriteAnother}
+                  disabled={!recognizedText || isWritingStory || isReading}
+                  className="bg-emerald-500 text-white font-bold py-2 px-6 rounded-full hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-emerald-300 disabled:scale-100 disabled:cursor-not-allowed"
+              >
+                  {isWritingStory ? 'Writing...' : 'Write Another'}
+              </button>
+            )}
         </div>
+        {speechError && <p className="text-sm text-red-500 mt-2">{speechError}</p>}
     </div>
   );
 };
