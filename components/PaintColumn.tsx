@@ -46,7 +46,7 @@ interface PaintColumnProps {
   isLoading: boolean;
   recognizedText: string | null;
   error: string | null;
-  onStartStory: () => void;
+  onStartStory: (coloredImageData: string | null) => void;
   isWritingStory: boolean;
   selectedTheme: string | null;
   onThemeChange: (theme: string) => void;
@@ -263,6 +263,12 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
     }
   };
 
+  const handleStartStoryClick = () => {
+    const canvas = canvasRef.current;
+    const dataUrl = canvas ? canvas.toDataURL('image/png') : null;
+    onStartStory(dataUrl);
+  };
+
   const ActiveThemeIcon = THEMES.find(t => t.id === selectedTheme)?.Icon;
 
 
@@ -332,11 +338,11 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                 ))}
               </div>
               
-                <div className="w-full p-2 bg-indigo-50 border border-indigo-200 rounded-lg mb-2">
-                    <p className="font-semibold text-indigo-800 text-sm mb-2">Choose a Story Theme</p>
+                <div className="w-full p-1 bg-indigo-50 border border-indigo-200 rounded-lg mb-1">
+                    <p className="font-semibold text-indigo-800 text-sm mb-1">Choose a Story Theme</p>
                     <div className="flex flex-wrap justify-center gap-2">
                         {THEMES.map(theme => (
-                            <button key={theme.id} onClick={() => onThemeChange(theme.id)} className={`flex items-center gap-2 py-1 px-3 rounded-full text-sm font-semibold transition-all duration-200 border-2 ${selectedTheme === theme.id ? `${theme.bg} ${theme.color} border-current` : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                            <button key={theme.id} onClick={() => onThemeChange(theme.id)} className={`flex items-center gap-1 py-1 px-2 rounded-full text-sm font-semibold transition-all duration-200 border-2 ${selectedTheme === theme.id ? `${theme.bg} ${theme.color} border-current` : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
                                 <theme.Icon className="h-4 w-4" />
                                 <span>{theme.label}</span>
                             </button>
@@ -358,7 +364,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                   <DownloadIcon className="h-5 w-5" />
                 </button>
                 <button
-                  onClick={onStartStory}
+                  onClick={handleStartStoryClick}
                   disabled={isWritingStory || !recognizedText || !selectedTheme}
                   className="bg-emerald-500 text-white font-bold py-2 px-6 rounded-full hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:bg-emerald-300 disabled:scale-100 disabled:cursor-not-allowed"
                 >

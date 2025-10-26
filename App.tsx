@@ -33,9 +33,9 @@ const TABS: { id: Tab; label: string; icon: React.FC<{className?: string}>; icon
 ];
 
 const TAB_STYLING: Record<Tab, { bg: string; border: string }> = {
-  draw: { bg: 'bg-amber-50', border: 'border-amber-200' },
-  paint: { bg: 'bg-orange-50', border: 'border-orange-200' },
-  story: { bg: 'bg-rose-50', border: 'border-rose-200' },
+  draw: { bg: 'bg-blue-50', border: 'border-blue-200' },
+  paint: { bg: 'bg-indigo-50', border: 'border-indigo-200' },
+  story: { bg: 'bg-emerald-50', border: 'border-emerald-200' },
 };
 
 /**
@@ -78,6 +78,7 @@ const App: React.FC = () => {
   const [recognizedObject, setRecognizedObject] = useState<string | null>(null);
   const [coloringPageImage, setColoringPageImage] = useState<string | null>(null);
   const [originalDrawingImage, setOriginalDrawingImage] = useState<string | null>(null);
+  const [coloredImage, setColoredImage] = useState<string | null>(null); // For story animation
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [drawError, setDrawError] = useState<string | null>(null);
@@ -101,6 +102,7 @@ const App: React.FC = () => {
     setSpeechData(null);
     setStoryError(null);
     setStoryTheme(null); // Clear theme on new drawing
+    setColoredImage(null); // Clear colored image for animation
     try {
       const text = await recognizeImage(base64ImageData);
       setRecognizedObject(text);
@@ -135,13 +137,14 @@ const App: React.FC = () => {
     generatePage();
   }, [recognizedObject]);
   
-  const handleStartWriting = async () => {
+  const handleStartWriting = async (coloredImageData: string | null) => {
     if (!recognizedObject || !storyTheme) return;
     setIsWritingStory(true);
     setStoryError(null);
     setStory(null);
     setStoryImage(null);
     setSpeechData(null);
+    setColoredImage(coloredImageData);
 
     try {
       const storyText = await generateStory(recognizedObject, storyTheme);
@@ -172,7 +175,7 @@ const App: React.FC = () => {
   const components: Record<Tab, React.ReactNode> = {
     draw : <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={drawError} onPlaySound={playSound} />,
     paint: <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={drawError} onStartStory={handleStartWriting} isWritingStory={isWritingStory} selectedTheme={storyTheme} onThemeChange={setStoryTheme} />,
-    story: <StoryColumn recognizedText={recognizedObject} story={story} storyImage={storyImage} speechData={speechData} isWritingStory={isWritingStory} storyError={storyError} onStartStory={handleStartWriting}/>
+    story: <StoryColumn recognizedText={recognizedObject} story={story} storyImage={storyImage} speechData={speechData} isWritingStory={isWritingStory} storyError={storyError} onStartStory={() => handleStartWriting(null)} originalDrawingImage={originalDrawingImage} coloredImage={coloredImage} />
   };
 
   return (

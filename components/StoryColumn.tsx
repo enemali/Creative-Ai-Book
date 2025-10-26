@@ -45,9 +45,11 @@ interface StoryColumnProps {
   isWritingStory: boolean;
   storyError: string | null;
   onStartStory: () => void;
+  originalDrawingImage: string | null;
+  coloredImage: string | null;
 }
 
-const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyImage, speechData, isWritingStory, storyError, onStartStory }) => {
+const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyImage, speechData, isWritingStory, storyError, onStartStory, originalDrawingImage, coloredImage }) => {
   const [displayedStory, setDisplayedStory] = useState<string>('');
   const [isReading, setIsReading] = useState(false);
   const [isMusicLoading, setIsMusicLoading] = useState(false);
@@ -63,7 +65,8 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyI
   const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const audioJobIdRef = useRef(0);
-  
+  const storyContentContainerRef = useRef<HTMLDivElement>(null);
+
   // Typing effect and state reset
   useEffect(() => {
     if (!story) {
@@ -229,43 +232,60 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyI
             <h2 className="text-2xl font-bold text-emerald-700">Story</h2>
         </div>
         
-        <div className="flex-grow w-full flex flex-col items-center justify-center mt-2">
-            {isWritingStory ? (
-                <>
-                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-200 border-t-emerald-500"></div>
-                    <p className="mt-4 text-lg font-semibold text-emerald-700">Crafting your story...</p>
-                </>
-            ) : storyError ? (
-                <p className="text-sm text-red-500">{storyError}</p>
-            ) : story ? (
-                <div className="w-full h-full flex flex-col">
-                    {storyImage ? (
-                        <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-                            <img src={storyImage} alt={`Illustration for a story about a ${recognizedText}`} className="w-full h-full object-cover" />
-                        </div>
-                    ) : (
-                         <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
-                            <p className="text-gray-400 text-sm">Illustration loading...</p>
-                        </div>
-                    )}
-                    <div className="flex-1 min-h-0 w-full text-left p-2 bg-white rounded-lg overflow-y-auto border border-gray-200">
-                        <p className="text-gray-700 whitespace-pre-wrap font-serif text-base leading-relaxed">{displayedStory}{displayedStory === story ? '' : <span className="inline-block w-2 h-4 bg-emerald-600 animate-pulse ml-1"></span>}</p>
-                    </div>
-                </div>
-            ) : (
-                <p className="text-gray-600">
-                    {recognizedText 
-                        ? `Go to the 'Paint' tab to write a story about a ${recognizedText}!` 
-                        : "Draw something, then create a story!"}
-                </p>
+        <div ref={storyContentContainerRef} className="flex-grow w-full flex flex-col items-center justify-center mt-2 relative">
+            {isReading && originalDrawingImage && coloredImage && (
+              <div className="absolute inset-0 pointer-events-none z-20">
+                  <div 
+                    className="absolute top-2 left-2 w-24 h-24 rounded-full border-4 border-white shadow-xl bg-cover bg-center"
+                    style={{ backgroundImage: `url(data:image/png;base64,${originalDrawingImage})` }}
+                  ></div>
+                  <div 
+                    className="absolute top-2 right-2 w-24 h-24 rounded-full border-4 border-white shadow-xl bg-cover bg-center"
+                    style={{ backgroundImage: `url(${coloredImage})` }}
+                  ></div>
+              </div>
             )}
+            
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+                {isWritingStory ? (
+                    <>
+                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-200 border-t-emerald-500"></div>
+                        <p className="mt-4 text-lg font-semibold text-emerald-700">Crafting your story...</p>
+                    </>
+                ) : storyError ? (
+                    <p className="text-sm text-red-500">{storyError}</p>
+                ) : story ? (
+                    <div className="w-full h-full flex flex-col">
+                        <>
+                          {storyImage ? (
+                              <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                                  <img src={storyImage} alt={`Illustration for a story about a ${recognizedText}`} className="w-full h-full object-cover" />
+                              </div>
+                          ) : (
+                              <div className="flex-[2_1_0%] min-h-0 mb-2 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+                                  <p className="text-gray-400 text-sm">Illustration loading...</p>
+                              </div>
+                          )}
+                          <div className="flex-1 min-h-0 w-full text-left p-2 bg-white rounded-lg overflow-y-auto border border-gray-200">
+                              <p className="text-gray-700 whitespace-pre-wrap font-serif text-base leading-relaxed">{displayedStory}{displayedStory === story ? '' : <span className="inline-block w-2 h-4 bg-emerald-600 animate-pulse ml-1"></span>}</p>
+                          </div>
+                        </>
+                    </div>
+                ) : (
+                    <p className="text-gray-600">
+                        {recognizedText 
+                            ? `Go to the 'Paint' tab to write a story about a ${recognizedText}!` 
+                            : "Draw something, then create a story!"}
+                    </p>
+                )}
+            </div>
         </div>
 
         <div className="mt-4 flex gap-4 items-center justify-center">
             {story && (
                 <button
                     onClick={handleReadStory}
-                    disabled={isWritingStory || !speechData}
+                    disabled={isWritingStory || !speechData || !coloredImage}
                     className="bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center w-36"
                 >
                     {isMusicLoading ? (
