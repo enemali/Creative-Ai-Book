@@ -131,7 +131,9 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!recognizedObject) return;
+    // Only generate a new page if it's a new drawing (not from history)
+    // and we don't already have a coloring page.
+    if (activeHistoryId !== null || !recognizedObject || coloringPageImage) return;
 
     const generatePage = async () => {
       setIsGenerating(true);
@@ -150,7 +152,7 @@ const App: React.FC = () => {
     };
 
     generatePage();
-  }, [recognizedObject]);
+  }, [recognizedObject, activeHistoryId, coloringPageImage]);
   
   const handleStartWriting = async (coloredImageData: string | null) => {
     if (!recognizedObject || !storyTheme) return;
@@ -219,7 +221,7 @@ const App: React.FC = () => {
   };
 
 
-  const commonColumnClasses = "p-4 border rounded-lg shadow-md min-h-[60vh] flex flex-col";
+  const commonColumnClasses = "p-4 border rounded-lg min-h-[60vh] flex flex-col";
 
   const components: Record<Tab, React.ReactNode> = {
     draw : <DrawColumn onRecognize={handleRecognizeDrawing} onClearDrawing={clearAllState} isHistoryFull={isHistoryFull} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={drawError} onPlaySound={playSound} originalDrawingImage={originalDrawingImage} />,

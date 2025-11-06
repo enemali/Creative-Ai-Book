@@ -72,7 +72,7 @@ export async function generateStory(promptText: string, theme: string | null): P
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const themeInstruction = theme ? ` The story must have a ${theme} theme.` : '';
-        const fullPrompt = `Write a short, fun, and imaginative story for a 5-year-old child about a ${promptText}.${themeInstruction} The story must be 3 to 4 sentences and must end with a safety warning or advise.`;
+        const fullPrompt = `Write a short, fun, and realistic story for a 5-year-old child about a ${promptText}.${themeInstruction} The story must be 3 to 4 sentences and must end with a safety warning or advise.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: fullPrompt,
