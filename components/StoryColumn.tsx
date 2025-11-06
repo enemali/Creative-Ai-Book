@@ -6,6 +6,13 @@ const SpeakerIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
+const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+);
+
+
 // --- Audio Helper Functions from Gemini Docs ---
 function decode(base64: string) {
   const binaryString = atob(base64);
@@ -213,6 +220,153 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyI
     onStartStory();
   };
 
+  const handleDownloadStory = async () => {
+        const container = storyContentContainerRef.current;
+        if (!container || !storyImage || !story) {
+            console.error("Download failed: missing required content.");
+            return;
+        }
+
+        const imageEl = container.querySelector('img');
+        const textContainerEl = container.querySelector('div[class*="overflow-y-auto"]');
+        if (!imageEl || !textContainerEl) {
+            console.error("Download failed: could not find required elements in the DOM.");
+            return;
+        }
+
+        try {
+            const { width, height } = container.getBoundingClientRect();
+            const scale = 2; // for higher resolution
+            const canvas = document.createElement('canvas');
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.scale(scale, scale);
+
+            const img = new Image();
+            img.onload = () => {
+                // Get styles and dimensions
+                const containerStyles = window.getComputedStyle(container);
+                const textEl = textContainerEl.querySelector('p');
+                if (!textEl) return;
+                const textStyles = window.getComputedStyle(textEl);
+                const textContainerStyles = window.getComputedStyle(textContainerEl);
+                const imageContainerEl = imageEl.parentElement!;
+                const imageContainerStyles = window.getComputedStyle(imageContainerEl);
+                const containerRect = container.getBoundingClientRect();
+                const imageContainerRect = imageContainerEl.getBoundingClientRect();
+                const textContainerRect = textContainerEl.getBoundingClientRect();
+
+                const imgX = imageContainerRect.left - containerRect.left;
+                const imgY = imageContainerRect.top - containerRect.top;
+                const imgW = imageContainerRect.width;
+                const imgH = imageContainerRect.height;
+
+                const textX = textContainerRect.left - containerRect.left;
+                const textY = textContainerRect.top - containerRect.top;
+                const textW = textContainerRect.width;
+                const textH = textContainerRect.height;
+                const textPadding = parseFloat(textContainerStyles.paddingLeft);
+
+                // Draw backgrounds
+                ctx.fillStyle = containerStyles.backgroundColor || 'white';
+                ctx.fillRect(0, 0, width, height);
+                
+                const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+                    if (w < 2 * r) r = w / 2;
+                    if (h < 2 * r) r = h / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x + r, y);
+                    ctx.arcTo(x + w, y, x + w, y + h, r);
+                    ctx.arcTo(x + w, y + h, x, y + h, r);
+                    ctx.arcTo(x, y + h, x, y, r);
+                    ctx.arcTo(x, y, x + w, y, r);
+                    ctx.closePath();
+                    return ctx;
+                };
+
+                ctx.fillStyle = textContainerStyles.backgroundColor || 'white';
+                drawRoundedRect(textX, textY, textW, textH, parseFloat(textContainerStyles.borderRadius)).fill();
+
+                // Draw image with clip path for border-radius and object-fit: cover logic
+                ctx.save();
+                drawRoundedRect(imgX, imgY, imgW, imgH, parseFloat(imageContainerStyles.borderRadius)).clip();
+                
+                const imgRatio = img.width / img.height;
+                const containerRatio = imgW / imgH;
+                let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+                if (imgRatio > containerRatio) { // Image is wider than its container
+                    sWidth = img.height * containerRatio;
+                    sx = (img.width - sWidth) / 2;
+                } else { // Image is taller or has same aspect ratio
+                    sHeight = img.width / containerRatio;
+                    sy = (img.height - sHeight) / 2;
+                }
+                ctx.drawImage(img, sx, sy, sWidth, sHeight, imgX, imgY, imgW, imgH);
+                ctx.restore();
+
+                // Draw text
+                ctx.fillStyle = textStyles.color;
+                ctx.font = `${textStyles.fontWeight} ${textStyles.fontSize} ${textStyles.fontFamily}`;
+                ctx.textBaseline = 'top';
+
+                const wrapText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+                    const paragraphs = text.split('\n');
+                    let currentY = y;
+                    for (const paragraph of paragraphs) {
+                        const words = paragraph.split(' ');
+                        let line = '';
+                        for (let n = 0; n < words.length; n++) {
+                            const testLine = line + words[n] + ' ';
+                            const metrics = context.measureText(testLine);
+                            const testWidth = metrics.width;
+                            if (testWidth > maxWidth && n > 0) {
+                                context.fillText(line, x, currentY);
+                                line = words[n] + ' ';
+                                currentY += lineHeight;
+                            } else {
+                                line = testLine;
+                            }
+                        }
+                        context.fillText(line, x, currentY);
+                        currentY += lineHeight;
+                    }
+                };
+                
+                const lineHeight = parseFloat(textStyles.lineHeight) || (parseFloat(textStyles.fontSize) * 1.2);
+                wrapText(ctx, story, textX + textPadding, textY + textPadding, textW - (textPadding * 2), lineHeight);
+
+                // Trigger download
+                const pngUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = pngUrl;
+                a.download = `story-${recognizedText?.replace(/\s+/g, '-') || 'creation'}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                URL.revokeObjectURL(img.src);
+            };
+
+            img.onerror = () => {
+                console.error("Failed to load image for download.");
+                URL.revokeObjectURL(img.src);
+            };
+            
+            fetch(storyImage)
+                .then(res => res.blob())
+                .then(blob => {
+                    img.src = URL.createObjectURL(blob);
+                })
+                .catch(e => console.error("Could not fetch image for download canvas:", e));
+
+        } catch (error) {
+            console.error("An error occurred during story download:", error);
+        }
+    };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -281,7 +435,7 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyI
             </div>
         </div>
 
-        <div className="mt-4 flex gap-4 items-center justify-center">
+        <div className="mt-4 flex flex-wrap gap-4 items-center justify-center">
             {story && (
                 <button
                     onClick={handleReadStory}
@@ -296,6 +450,17 @@ const StoryColumn: React.FC<StoryColumnProps> = ({ recognizedText, story, storyI
                             <span>{isReading ? 'Stop' : 'Read Story'}</span>
                         </>
                     )}
+                </button>
+            )}
+             {story && (
+                <button
+                    onClick={handleDownloadStory}
+                    disabled={isWritingStory || isReading}
+                    className="bg-indigo-500 text-white font-bold p-3 rounded-full hover:bg-indigo-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-indigo-300 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center"
+                    title="Download Story Image"
+                    aria-label="Download Story Image"
+                >
+                    <DownloadIcon className="h-5 w-5" />
                 </button>
             )}
             {story && recognizedText && (
