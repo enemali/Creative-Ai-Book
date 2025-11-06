@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 
 const BrushModeIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
     </svg>
 );
@@ -43,6 +43,7 @@ const THEMES = [
 interface PaintColumnProps {
   coloringPageImage: string | null;
   originalDrawingImage: string | null;
+  coloredImage: string | null;
   isLoading: boolean;
   recognizedText: string | null;
   error: string | null;
@@ -85,7 +86,7 @@ const drawImageWithAspectRatio = (ctx: CanvasRenderingContext2D, img: HTMLImageE
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 };
 
-const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDrawingImage, isLoading, recognizedText, onStartStory, isWritingStory, selectedTheme, onThemeChange }) => {
+const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDrawingImage, coloredImage, isLoading, recognizedText, onStartStory, isWritingStory, selectedTheme, onThemeChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPainting, setIsPainting] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
@@ -170,9 +171,10 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
     if (!canvas) return;
 
     const image = new Image();
-    
+    const imageToLoad = coloredImage || coloringPageImage;
+
     const initialDraw = () => {
-        if (!canvas || !coloringPageImage || !image.complete) return;
+        if (!canvas || !imageToLoad || !image.complete) return;
         const context = getContext();
         if (!context) return;
         
@@ -182,8 +184,8 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
         drawImageWithAspectRatio(context, image);
     };
 
-    if (coloringPageImage) {
-        image.src = coloringPageImage;
+    if (imageToLoad) {
+        image.src = imageToLoad;
         image.onload = initialDraw;
         if (image.complete) initialDraw(); // Handle cached images
     } else {
@@ -223,9 +225,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
                     if (hasContentToPreserve) {
                         drawImageWithAspectRatio(ctx, tempCanvas);
                     } else {
-                        // This is the first time the canvas gets a size.
-                        // We need to draw the base image if it's loaded.
-                        if (coloringPageImage && image.complete) {
+                        if (imageToLoad && image.complete) {
                            drawImageWithAspectRatio(ctx, image);
                         } else {
                            ctx.fillStyle = 'white';
@@ -243,7 +243,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
         resizeObserver.disconnect();
         image.onload = null;
     };
-}, [coloringPageImage]);
+}, [coloringPageImage, coloredImage]);
 
 
   const startPainting = (event: React.MouseEvent | React.TouchEvent) => {

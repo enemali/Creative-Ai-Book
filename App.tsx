@@ -3,6 +3,8 @@ import DrawColumn from './components/DrawColumn';
 import PaintColumn from './components/PaintColumn';
 import StoryColumn from './components/StoryColumn';
 import { recognizeImage, generateColoringPage, generateStory, generateSpeech, generateStoryImage } from './api';
+import { useHistory, HistoryItem } from './hooks/useHistory';
+
 
 // Icon components moved here for use in the mobile tab bar
 const BrushIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
@@ -74,11 +76,14 @@ const playSound = async (soundUrl: string) => {
 
 
 const App: React.FC = () => {
+  const { history, addHistory, deleteHistory, isHistoryFull } = useHistory();
+  const [activeHistoryId, setActiveHistoryId] = useState<number | null>(null);
+
   const [activeTab, setActiveTab] = useState<Tab>('draw');
   const [recognizedObject, setRecognizedObject] = useState<string | null>(null);
   const [coloringPageImage, setColoringPageImage] = useState<string | null>(null);
   const [originalDrawingImage, setOriginalDrawingImage] = useState<string | null>(null);
-  const [coloredImage, setColoredImage] = useState<string | null>(null); // For story animation
+  const [coloredImage, setColoredImage] = useState<string | null>(null); // For story animation AND history
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [drawError, setDrawError] = useState<string | null>(null);
@@ -91,18 +96,28 @@ const App: React.FC = () => {
   const [storyError, setStoryError] = useState<string | null>(null);
   const [storyTheme, setStoryTheme] = useState<string | null>(null);
 
-  const handleRecognizeDrawing = async (base64ImageData: string) => {
-    setIsRecognizing(true);
+  const clearAllState = () => {
+    setActiveHistoryId(null);
     setRecognizedObject(null);
     setColoringPageImage(null);
-    setOriginalDrawingImage(base64ImageData);
-    setDrawError(null);
-    setStory(null); // Clear old story
+    setOriginalDrawingImage(null);
+    setColoredImage(null);
+    setStory(null);
     setStoryImage(null);
     setSpeechData(null);
+    setStoryTheme(null);
+    setDrawError(null);
     setStoryError(null);
-    setStoryTheme(null); // Clear theme on new drawing
-    setColoredImage(null); // Clear colored image for animation
+    setIsRecognizing(false);
+    setIsGenerating(false);
+    setIsWritingStory(false);
+    setActiveTab('draw');
+  };
+
+  const handleRecognizeDrawing = async (base64ImageData: string) => {
+    clearAllState(); // Clear everything for a new drawing
+    setIsRecognizing(true);
+    setOriginalDrawingImage(base64ImageData);
     try {
       const text = await recognizeImage(base64ImageData);
       setRecognizedObject(text);
@@ -160,6 +175,19 @@ const App: React.FC = () => {
       setStoryImage(imageUrl);
       setSpeechData(audioData);
       
+      if (!activeHistoryId) { // Only save if it's a new creation, not a recalled one
+        addHistory({
+            originalDrawingImage: originalDrawingImage!,
+            recognizedObject: recognizedObject!,
+            coloringPageImage: coloringPageImage!,
+            coloredImage: coloredImageData,
+            story: storyText,
+            storyImage: imageUrl,
+            speechData: audioData,
+            storyTheme: storyTheme!,
+        });
+      }
+
       await playSound('/winSound.mp3');
     } catch (err: any) {
       console.error("Story generation process failed:", err);
@@ -168,21 +196,74 @@ const App: React.FC = () => {
       setIsWritingStory(false);
     }
   };
+  
+  const handleLoadHistory = (item: HistoryItem) => {
+    clearAllState();
+    setActiveHistoryId(item.id);
+    setRecognizedObject(item.recognizedObject);
+    setColoringPageImage(item.coloringPageImage);
+    setOriginalDrawingImage(item.originalDrawingImage);
+    setColoredImage(item.coloredImage);
+    setStory(item.story);
+    setStoryImage(item.storyImage);
+    setSpeechData(item.speechData);
+    setStoryTheme(item.storyTheme);
+    setActiveTab('draw'); // Start at draw tab to show original image
+  };
+
+  const handleDeleteHistory = (id: number) => {
+    if (activeHistoryId === id) {
+        clearAllState();
+    }
+    deleteHistory(id);
+  };
 
 
   const commonColumnClasses = "p-4 border rounded-lg shadow-md min-h-[60vh] flex flex-col";
 
   const components: Record<Tab, React.ReactNode> = {
-    draw : <DrawColumn onRecognize={handleRecognizeDrawing} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={drawError} onPlaySound={playSound} />,
-    paint: <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} isLoading={isGenerating} recognizedText={recognizedObject} error={drawError} onStartStory={handleStartWriting} isWritingStory={isWritingStory} selectedTheme={storyTheme} onThemeChange={setStoryTheme} />,
-    story: <StoryColumn recognizedText={recognizedObject} story={story} storyImage={storyImage} speechData={speechData} isWritingStory={isWritingStory} storyError={storyError} onStartStory={() => handleStartWriting(null)} originalDrawingImage={originalDrawingImage} coloredImage={coloredImage} />
+    draw : <DrawColumn onRecognize={handleRecognizeDrawing} onClearDrawing={clearAllState} isHistoryFull={isHistoryFull} isLoading={isRecognizing} isGenerating={isGenerating} recognizedText={recognizedObject} error={drawError} onPlaySound={playSound} originalDrawingImage={originalDrawingImage} />,
+    paint: <PaintColumn coloringPageImage={coloringPageImage} originalDrawingImage={originalDrawingImage} coloredImage={coloredImage} isLoading={isGenerating} recognizedText={recognizedObject} error={drawError} onStartStory={handleStartWriting} isWritingStory={isWritingStory} selectedTheme={storyTheme} onThemeChange={setStoryTheme} />,
+    story: <StoryColumn recognizedText={recognizedObject} story={story} storyImage={storyImage} speechData={speechData} isWritingStory={isWritingStory} storyError={storyError} onStartStory={() => handleStartWriting(coloredImage)} originalDrawingImage={originalDrawingImage} coloredImage={coloredImage} />
   };
 
   return (
     <div className="min-h-screen text-stone-800 p-2 sm:p-4">
-      <header className="text-center mb-1">
+      <header className="text-center mb-0">
         <h3 className="text-2xl md:text-2xl font-bold text-blue-600 tracking-tight">Creative Suite</h3>
-        <p className="text-lg text-stone-600 mt-1">AI space to draw, paint and tell stories.</p>
+        <p className="text-lg text-stone-600 mt-0">AI space to draw, paint and tell stories.</p>
+         {/* History Section */}
+         <div className="mt-4">
+            <h4 className="text-lg font-semibold text-stone-700">History</h4>
+            <div className="mt-2 mb-4 flex justify-center items-center gap-3 flex-wrap px-4 min-h-[6rem]">
+                {history.length > 0 ? (
+                    history.map(item => (
+                        <div key={item.id} className="relative group w-20 h-20 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                            <button 
+                                onClick={() => handleLoadHistory(item)}
+                                className="w-full h-full rounded-lg overflow-hidden border-2 border-transparent group-hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                title={`Load story about ${item.recognizedObject}`}
+                            >
+                                <img 
+                                    src={item.coloredImage || `data:image/png;base64,${item.originalDrawingImage}`} 
+                                    alt={item.recognizedObject}
+                                    className="w-full h-full object-cover"
+                                />
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteHistory(item.id)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform hover:scale-110"
+                                aria-label="Delete history item"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-stone-500">Your creations will appear here.</p>
+                )}
+            </div>
+         </div>
       </header>
 
       <main>

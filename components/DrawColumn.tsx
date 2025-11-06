@@ -8,6 +8,38 @@ const CameraIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" })
     </svg>
 );
 
+// FIX: Updated function signature to accept HTMLVideoElement to fix TypeScript error on line 235.
+// Helper to draw an image on a canvas while maintaining aspect ratio
+const drawImageWithAspectRatio = (ctx: CanvasRenderingContext2D, img: HTMLImageElement | HTMLVideoElement) => {
+    const canvas = ctx.canvas;
+    const { width, height } = canvas;
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, width, height);
+
+    const imgWidth = img instanceof HTMLVideoElement ? img.videoWidth : img.width;
+    const imgHeight = img instanceof HTMLVideoElement ? img.videoHeight : img.height;
+
+    if (imgWidth === 0 || imgHeight === 0) return;
+
+    const imgAspectRatio = imgWidth / imgHeight;
+    const canvasAspectRatio = width / height;
+
+    let drawWidth, drawHeight, drawX, drawY;
+
+    if (imgAspectRatio > canvasAspectRatio) {
+        drawWidth = width;
+        drawHeight = width / imgAspectRatio;
+        drawX = 0;
+        drawY = (height - drawHeight) / 2;
+    } else {
+        drawHeight = height;
+        drawWidth = height * imgAspectRatio;
+        drawY = 0;
+        drawX = (width - drawWidth) / 2;
+    }
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+};
+
 
 interface DrawColumnProps {
   onRecognize: (base64ImageData: string) => void;
@@ -16,9 +48,12 @@ interface DrawColumnProps {
   recognizedText: string | null;
   error: string | null;
   onPlaySound: (soundUrl: string) => void;
+  isHistoryFull: boolean;
+  onClearDrawing: () => void;
+  originalDrawingImage: string | null;
 }
 
-const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGenerating, recognizedText, error, onPlaySound }) => {
+const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGenerating, recognizedText, error, onPlaySound, isHistoryFull, onClearDrawing, originalDrawingImage }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -29,16 +64,16 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const getContext = () => canvasRef.current?.getContext('2d');
+
   useEffect(() => {
     if (!showWebcam) {
-      return; // Do nothing if the webcam modal isn't supposed to be shown
+      return; 
     }
-
-    // This function starts the webcam stream
     const startStream = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            streamRef.current = stream; // Keep a reference to the stream object
+            streamRef.current = stream;
             if (webcamVideoRef.current) {
                 webcamVideoRef.current.srcObject = stream;
             }
@@ -46,24 +81,18 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
             console.error("Error accessing webcam", err);
         }
     };
-    
     startStream();
-
-    // This cleanup function runs when `showWebcam` becomes false or the component unmounts
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop()); // Stop all tracks
+        streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
       if (webcamVideoRef.current) {
-        webcamVideoRef.current.srcObject = null; // Clear the video element's source
+        webcamVideoRef.current.srcObject = null;
       }
     };
   }, [showWebcam]);
 
-
-  const getContext = () => canvasRef.current?.getContext('2d');
-  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -71,52 +100,23 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
             const { width, height } = entry.contentRect;
-
-            if (width === 0 || height === 0 || (canvas.width === width && canvas.height === height)) {
-                continue;
-            }
+            if (width === 0 || height === 0 || (canvas.width === width && canvas.height === height)) continue;
             
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
-            
             if (tempCtx) {
-                // Preserve current content
                 tempCanvas.width = canvas.width;
                 tempCanvas.height = canvas.height;
-                if (canvas.width > 0 && canvas.height > 0) {
-                    tempCtx.drawImage(canvas, 0, 0);
-                }
+                if (canvas.width > 0 && canvas.height > 0) tempCtx.drawImage(canvas, 0, 0);
 
-                // Resize the main canvas
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = getContext();
                 if (ctx) {
-                    // Fill with white background first
                     ctx.fillStyle = "white";
                     ctx.fillRect(0, 0, width, height);
+                    if (tempCanvas.width > 0 && tempCanvas.height > 0) ctx.drawImage(tempCanvas, 0, 0, width, height);
                     
-                    // Draw preserved content back, maintaining aspect ratio
-                    if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-                        const tempAspectRatio = tempCanvas.width / tempCanvas.height;
-                        const canvasAspectRatio = width / height;
-                        let drawWidth, drawHeight, drawX, drawY;
-
-                        if (tempAspectRatio > canvasAspectRatio) {
-                            drawWidth = width;
-                            drawHeight = width / tempAspectRatio;
-                            drawX = 0;
-                            drawY = (height - drawHeight) / 2;
-                        } else {
-                            drawHeight = height;
-                            drawWidth = height * tempAspectRatio;
-                            drawY = 0;
-                            drawX = (width - drawWidth) / 2;
-                        }
-                        ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
-                    }
-                    
-                    // Restore drawing settings as they are reset on resize
                     ctx.lineCap = 'round';
                     ctx.strokeStyle = 'black';
                     ctx.lineWidth = 3;
@@ -125,7 +125,6 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
         }
     });
 
-    // Initial setup to ensure canvas has a size before observer starts
     const { width, height } = canvas.getBoundingClientRect();
     if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
@@ -143,9 +142,33 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
     resizeObserver.observe(canvas);
     return () => { resizeObserver.disconnect(); };
   }, []);
+  
+  // Effect to handle drawing an initial image (from history) or clearing
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = getContext();
+    if (!canvas || !context) return;
+
+    if (originalDrawingImage) {
+        const img = new Image();
+        img.onload = () => {
+            drawImageWithAspectRatio(context, img);
+            setHasDrawn(true);
+            setIsPhotoOnCanvas(true); // Lock canvas for recalled drawings
+        };
+        img.src = `data:image/png;base64,${originalDrawingImage}`;
+    } else {
+        // Clear canvas if no image
+        context.fillStyle = "white";
+        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+        setHasDrawn(false);
+        setIsPhotoOnCanvas(false);
+        setValidationError(null);
+    }
+  }, [originalDrawingImage]);
 
   const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
-    if (isPhotoOnCanvas) return; // Disable drawing over a photo
+    if (isPhotoOnCanvas) return;
     setValidationError(null);
     const { offsetX, offsetY } = getCoords(event);
     const context = getContext();
@@ -187,6 +210,11 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
 
   const handleRecognizeClick = () => {
     setValidationError(null);
+    if (isHistoryFull) {
+        setValidationError("History is full. Delete an item to start a new drawing.");
+        onPlaySound('/error.mp3');
+        return;
+    }
     if (!hasDrawn) {
         setValidationError("Please draw something first.");
         onPlaySound('/error.mp3');
@@ -201,47 +229,14 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
     }
   };
 
-  const handleClearClick = () => {
-    const context = getContext();
-    if (context) {
-      context.fillStyle = "white";
-      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-      setHasDrawn(false);
-      setIsPhotoOnCanvas(false);
-      setValidationError(null);
-    }
-  };
-
   const handleCapture = () => {
     const video = webcamVideoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.videoWidth === 0) return;
-
     const context = getContext();
     if (!context) return;
-
-    context.fillStyle = "white";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const videoAspectRatio = video.videoWidth / video.videoHeight;
-    const canvasAspectRatio = canvas.width / canvas.height;
-    
-    let drawWidth, drawHeight, drawX, drawY;
-
-    if (videoAspectRatio > canvasAspectRatio) {
-      drawWidth = canvas.width;
-      drawHeight = canvas.width / videoAspectRatio;
-      drawX = 0;
-      drawY = (canvas.height - drawHeight) / 2;
-    } else {
-      drawHeight = canvas.height;
-      drawWidth = canvas.height * videoAspectRatio;
-      drawY = 0;
-      drawX = (canvas.width - drawWidth) / 2;
-    }
-    
-    context.drawImage(video, drawX, drawY, drawWidth, drawHeight);
-    
+    onClearDrawing(); // Clear app state before capturing new image
+    drawImageWithAspectRatio(context, video);
     setHasDrawn(true);
     setIsPhotoOnCanvas(true);
     setShowWebcam(false);
@@ -295,13 +290,13 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
         )}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 mt-2">
-        <button onClick={handleClearClick} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-full hover:bg-gray-300 transition-all duration-300">
+        <button onClick={onClearDrawing} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-full hover:bg-gray-300 transition-all duration-300">
           Clear
         </button>
         <button
           onClick={handleRecognizeClick}
-          disabled={showOverlay}
-          className="bg-blue-500 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100"
+          disabled={showOverlay || isHistoryFull}
+          className="bg-blue-500 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100 disabled:cursor-not-allowed"
         >
           Surprise
         </button>
@@ -315,7 +310,9 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
         </button>
       </div>
       <div className="mt-2 h-12 flex items-center justify-center">
-        {validationError ? (
+        {isHistoryFull && !recognizedText && !isLoading ? (
+            <p className="text-sm text-amber-600">History is full. Delete an item to draw.</p>
+        ) : validationError ? (
             <p className="text-sm text-red-500">{validationError}</p>
         ) : error ? (
             <p className="text-sm text-red-500">{error}</p>
