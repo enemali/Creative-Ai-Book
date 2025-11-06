@@ -33,9 +33,9 @@ const TABS: { id: Tab; label: string; icon: React.FC<{className?: string}>; icon
 ];
 
 const TAB_STYLING: Record<Tab, { bg: string; border: string }> = {
-  draw: { bg: 'bg-blue-50', border: 'border-blue-300' },
-  paint: { bg: 'bg-indigo-50', border: 'border-blue-300' },
-  story: { bg: 'bg-emerald-50', border: 'border-blue-300' },
+  draw: { bg: 'bg-blue-50', border: 'border-blue-500' },
+  paint: { bg: 'bg-indigo-50', border: 'border-blue-500' },
+  story: { bg: 'bg-emerald-50', border: 'border-blue-500' },
 };
 
 /**
@@ -188,7 +188,7 @@ const App: React.FC = () => {
       <main>
         {/* Mobile Tabbed View Controls */}
         <div className="md:hidden">
-          <div className="flex border-b border-blue-300 mb-4">
+          <div className="flex border-b border-blue-500 mb-4">
             {TABS.map((tab) => (
               <button
                 key={tab.id}

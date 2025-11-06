@@ -57,12 +57,40 @@ const COLORS = [
   '#00FFFF', '#FFA500', '#800080', '#4B0082', '#A52A2A', '#FFFFFF'
 ];
 
+// Helper to draw an image on a canvas while maintaining aspect ratio
+const drawImageWithAspectRatio = (ctx: CanvasRenderingContext2D, img: HTMLImageElement | HTMLCanvasElement) => {
+    const canvas = ctx.canvas;
+    const { width, height } = canvas;
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, width, height);
+
+    if (img.width === 0 || img.height === 0) return;
+
+    const imgAspectRatio = img.width / img.height;
+    const canvasAspectRatio = width / height;
+
+    let drawWidth, drawHeight, drawX, drawY;
+
+    if (imgAspectRatio > canvasAspectRatio) {
+        drawWidth = width;
+        drawHeight = width / imgAspectRatio;
+        drawX = 0;
+        drawY = (height - drawHeight) / 2;
+    } else {
+        drawHeight = height;
+        drawWidth = height * imgAspectRatio;
+        drawY = 0;
+        drawX = (width - drawWidth) / 2;
+    }
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+};
+
 const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDrawingImage, isLoading, recognizedText, onStartStory, isWritingStory, selectedTheme, onThemeChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPainting, setIsPainting] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
-  const [paintMode, setPaintMode] = useState<'brush' | 'fill'>('brush');
+  const [paintMode, setPaintMode] = useState<'brush' | 'fill'>('fill');
 
   const getContext = () => canvasRef.current?.getContext('2d', { willReadFrequently: true });
   
@@ -141,35 +169,70 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let image: HTMLImageElement | null = null;
-    if (coloringPageImage) {
-        image = new Image();
-        image.src = coloringPageImage;
-    }
-
-    const redraw = () => {
-        if (!canvas) return;
+    const image = new Image();
+    
+    const initialDraw = () => {
+        if (!canvas || !coloringPageImage || !image.complete) return;
         const context = getContext();
         if (!context) return;
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        if (image) {
-            context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        }
+        
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        
+        drawImageWithAspectRatio(context, image);
     };
-    
-    if (image) {
-        image.onload = redraw;
+
+    if (coloringPageImage) {
+        image.src = coloringPageImage;
+        image.onload = initialDraw;
+        if (image.complete) initialDraw(); // Handle cached images
     } else {
-        redraw(); // Clear canvas if no image
+        // Clear canvas if no image
+        const context = getContext();
+        if (context) {
+            context.fillStyle = 'white';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+        }
     }
 
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
             const { width, height } = entry.contentRect;
-            if (canvas.width !== width || canvas.height !== height) {
+
+            if (width === 0 || height === 0 || (canvas.width === width && canvas.height === height)) {
+                continue;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (tempCtx) {
+                const hasContentToPreserve = canvas.width > 0 && canvas.height > 0;
+                
+                if (hasContentToPreserve) {
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    tempCtx.drawImage(canvas, 0, 0);
+                }
+                
                 canvas.width = width;
                 canvas.height = height;
-                redraw();
+
+                const ctx = getContext();
+                if (ctx) {
+                    if (hasContentToPreserve) {
+                        drawImageWithAspectRatio(ctx, tempCanvas);
+                    } else {
+                        // This is the first time the canvas gets a size.
+                        // We need to draw the base image if it's loaded.
+                        if (coloringPageImage && image.complete) {
+                           drawImageWithAspectRatio(ctx, image);
+                        } else {
+                           ctx.fillStyle = 'white';
+                           ctx.fillRect(0, 0, width, height);
+                        }
+                    }
+                }
             }
         }
     });
@@ -178,6 +241,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
 
     return () => {
         resizeObserver.disconnect();
+        image.onload = null;
     };
 }, [coloringPageImage]);
 
@@ -238,8 +302,7 @@ const PaintColumn: React.FC<PaintColumnProps> = ({ coloringPageImage, originalDr
     if (canvas && context && coloringPageImage) {
       const img = new Image();
       img.onload = () => {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        drawImageWithAspectRatio(context, img);
       };
       img.src = coloringPageImage;
     }

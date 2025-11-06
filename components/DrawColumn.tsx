@@ -1,4 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
+import WebcamModal from './WebcamModal';
+
+const CameraIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+      <circle cx="12" cy="13" r="3"></circle>
+    </svg>
+);
+
 
 interface DrawColumnProps {
   onRecognize: (base64ImageData: string) => void;
@@ -14,6 +23,44 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isPhotoOnCanvas, setIsPhotoOnCanvas] = useState(false);
+
+  const [showWebcam, setShowWebcam] = useState(false);
+  const webcamVideoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!showWebcam) {
+      return; // Do nothing if the webcam modal isn't supposed to be shown
+    }
+
+    // This function starts the webcam stream
+    const startStream = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            streamRef.current = stream; // Keep a reference to the stream object
+            if (webcamVideoRef.current) {
+                webcamVideoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            console.error("Error accessing webcam", err);
+        }
+    };
+    
+    startStream();
+
+    // This cleanup function runs when `showWebcam` becomes false or the component unmounts
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop()); // Stop all tracks
+        streamRef.current = null;
+      }
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = null; // Clear the video element's source
+      }
+    };
+  }, [showWebcam]);
+
 
   const getContext = () => canvasRef.current?.getContext('2d');
   
@@ -24,24 +71,81 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
             const { width, height } = entry.contentRect;
-            canvas.width = width;
-            canvas.height = height;
+
+            if (width === 0 || height === 0 || (canvas.width === width && canvas.height === height)) {
+                continue;
+            }
             
-            const context = getContext();
-            if (context) {
-                context.fillStyle = "white";
-                context.fillRect(0, 0, width, height);
-                context.lineCap = 'round';
-                context.strokeStyle = 'black';
-                context.lineWidth = 3;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (tempCtx) {
+                // Preserve current content
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                if (canvas.width > 0 && canvas.height > 0) {
+                    tempCtx.drawImage(canvas, 0, 0);
+                }
+
+                // Resize the main canvas
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = getContext();
+                if (ctx) {
+                    // Fill with white background first
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, width, height);
+                    
+                    // Draw preserved content back, maintaining aspect ratio
+                    if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+                        const tempAspectRatio = tempCanvas.width / tempCanvas.height;
+                        const canvasAspectRatio = width / height;
+                        let drawWidth, drawHeight, drawX, drawY;
+
+                        if (tempAspectRatio > canvasAspectRatio) {
+                            drawWidth = width;
+                            drawHeight = width / tempAspectRatio;
+                            drawX = 0;
+                            drawY = (height - drawHeight) / 2;
+                        } else {
+                            drawHeight = height;
+                            drawWidth = height * tempAspectRatio;
+                            drawY = 0;
+                            drawX = (width - drawWidth) / 2;
+                        }
+                        ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
+                    }
+                    
+                    // Restore drawing settings as they are reset on resize
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 3;
+                }
             }
         }
     });
+
+    // Initial setup to ensure canvas has a size before observer starts
+    const { width, height } = canvas.getBoundingClientRect();
+    if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = getContext();
+        if (ctx) {
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, width, height);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+        }
+    }
+    
     resizeObserver.observe(canvas);
     return () => { resizeObserver.disconnect(); };
   }, []);
 
   const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
+    if (isPhotoOnCanvas) return; // Disable drawing over a photo
     setValidationError(null);
     const { offsetX, offsetY } = getCoords(event);
     const context = getContext();
@@ -52,7 +156,7 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
   };
 
   const draw = (event: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
+    if (!isDrawing || isPhotoOnCanvas) return;
     if (!hasDrawn) setHasDrawn(true);
     const { offsetX, offsetY } = getCoords(event);
     const context = getContext();
@@ -103,8 +207,48 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
       context.fillStyle = "white";
       context.fillRect(0, 0, context.canvas.width, context.canvas.height);
       setHasDrawn(false);
+      setIsPhotoOnCanvas(false);
       setValidationError(null);
     }
+  };
+
+  const handleCapture = () => {
+    const video = webcamVideoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0) return;
+
+    const context = getContext();
+    if (!context) return;
+
+    context.fillStyle = "white";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    const canvasAspectRatio = canvas.width / canvas.height;
+    
+    let drawWidth, drawHeight, drawX, drawY;
+
+    if (videoAspectRatio > canvasAspectRatio) {
+      drawWidth = canvas.width;
+      drawHeight = canvas.width / videoAspectRatio;
+      drawX = 0;
+      drawY = (canvas.height - drawHeight) / 2;
+    } else {
+      drawHeight = canvas.height;
+      drawWidth = canvas.height * videoAspectRatio;
+      drawY = 0;
+      drawX = (canvas.width - drawWidth) / 2;
+    }
+    
+    context.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+    
+    setHasDrawn(true);
+    setIsPhotoOnCanvas(true);
+    setShowWebcam(false);
+  };
+
+  const handleCancelWebcam = () => {
+    setShowWebcam(false);
   };
 
   const showOverlay = isLoading || isGenerating;
@@ -112,16 +256,22 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
 
   return (
     <div className="flex flex-col items-center text-center h-full">
+      <WebcamModal 
+            showWebcam={showWebcam}
+            webcamVideoRef={webcamVideoRef}
+            onCapture={handleCapture}
+            onCancel={handleCancelWebcam}
+        />
       <div className="flex items-center justify-center gap-2 mb-1">
         <h2 className="text-2xl font-bold text-blue-700">Draw</h2>
       </div>
       <p className="text-gray-600 mb-2">
-        Draw something in the box below.
+        Draw in the box, or use your camera for a paper drawing.
       </p>
       <div className="relative w-full">
         <canvas
           ref={canvasRef}
-          className={`${commonMediaClasses} touch-none bg-white`}
+          className={`${commonMediaClasses} ${isPhotoOnCanvas ? 'cursor-not-allowed' : 'touch-none'} bg-white`}
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -144,7 +294,7 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 mt-2">
         <button onClick={handleClearClick} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-full hover:bg-gray-300 transition-all duration-300">
           Clear
         </button>
@@ -153,7 +303,15 @@ const DrawColumn: React.FC<DrawColumnProps> = ({ onRecognize, isLoading, isGener
           disabled={showOverlay}
           className="bg-blue-500 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-blue-300 disabled:scale-100"
         >
-          {isLoading ? 'Recognizing...' : 'Recognize'}
+          Surprise
+        </button>
+         <button 
+          onClick={() => setShowWebcam(true)}
+          disabled={showOverlay}
+          className="bg-purple-500 text-white font-bold py-2 px-4 rounded-full hover:bg-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:bg-purple-300 disabled:scale-100"
+        >
+          <CameraIcon className="h-5 w-5" />
+          <span>{isPhotoOnCanvas ? 'Retake Photo' : 'Camera'}</span>
         </button>
       </div>
       <div className="mt-2 h-12 flex items-center justify-center">
